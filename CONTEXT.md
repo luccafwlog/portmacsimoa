@@ -48,8 +48,23 @@ terminologia aprovada.
   550 t/período, é ele quem informa os dois números. O simulador não arbitra esse
   ganho — arbitrar seria inventar produtividade, que é justamente o que ele não
   faz.
-- **Período** — a jornada de 12 horas: 7h–19h (diurno) e 19h–7h (noturno). Dois
-  por dia. É a unidade de requisição e a unidade em que o piso é avaliado.
+
+  O que se sabe na hora de cotar é o **total de ternos do navio**; quantos operam
+  em cada período, não. Por isso o simulador **distribui os ternos linearmente**
+  pelos períodos por padrão, e deixa **ajustar período a período** depois. A
+  distribuição média é um ponto de partida declarado, não uma medição — e é por
+  isso que o ajuste manual existe.
+- **Período** — a jornada de **6 horas**. São **quatro por dia**: `01–07`,
+  `07–13`, `13–19` e `19–01`. É a unidade de requisição, a unidade em que o piso
+  é avaliado e a unidade em que o usuário declara o início da operação.
+
+  Cada período pertence ao **dia civil em que começa** — o `01–07` de sexta é
+  período de sexta, não madrugada de quinta. É o dia de início que o calendário
+  do OGMO classifica (comum, sábado, domingo, feriado) e que determina o
+  multiplicador.
+
+  Para o multiplicador, `07–13` e `13–19` são **diurnos**; `19–01` e `01–07` são
+  **noturnos**.
 - **Produtividade** — quanto **o navio inteiro** move num período, não quanto um
   terno move. É **input do operador**, não dado de catálogo: quem cota conhece o
   navio, o guindaste e o berço. O simulador é calculadora, não estimador.
@@ -62,6 +77,24 @@ terminologia aprovada.
   mesmo sem produção.
 - **Total c/E.S** — a coluna que a PORTMAC paga; `Base × 2,152842`. É a única
   que entra na conta ([#11](https://github.com/luccafwlog/portmacsimoa/issues/11)).
+
+## O que o usuário declara
+
+Cinco coisas, e nada mais:
+
+1. **Faina** — o tipo de carga e a operação sobre ela.
+2. **Data e período de início** — ex.: período `01–07` de sexta, 04/09.
+3. **Volume total** do navio.
+4. **Produtividade** do navio, por período.
+5. **Total de ternos** do navio.
+
+O simulador não estima nenhuma dessas. Ele as cruza com os catálogos cadastrados
+e com o calendário do OGMO, e devolve o custo.
+
+O exemplo que fixa o modelo: início no período `01–07` de sexta 04/09, 25
+períodos. O calendário resolve o resto — a operação atravessa sábado 05/09,
+domingo 06/09 e o feriado de 07/09, e cada período já sai com sua classe e seu
+multiplicador. É daí que vem o custo período a período.
 
 ## A regra que governa tudo
 
@@ -101,6 +134,16 @@ O que já está no código e conferido contra o documento:
 - Os oito multiplicadores de período da Cláusula Sexta.
 - Equipe referência da estiva e da conferência (ANEXO II e III), com escalas.
 - Granito (5.1) sob ACT: taxa homem 0,99, taxa equipe 3,01, salário-dia 410,14.
+
+O que o código **contradiz** e precisa ser corrigido:
+
+- **A jornada.** `src/motor/periodos.ts` implementa dois períodos de 12 h
+  (7–19 e 19–7). São **quatro de 6 h**. Toda a projeção de períodos, o
+  ancoramento do início e a contagem do piso mudam com isso.
+- **A entrada.** O motor pede um instante com hora e minuto e deduz o período.
+  O usuário declara o período diretamente.
+- **Os ternos.** Hoje são um número fixo para a operação inteira. Passam a ser
+  um total distribuído pelos períodos, ajustável.
 
 O que falta, e por quê:
 
