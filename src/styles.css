@@ -50,6 +50,7 @@ button { cursor: pointer; }
 .eyebrow { color: var(--navy-2); font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500; letter-spacing: .14em; }
 .eyebrow span { color: var(--yellow); padding: 0 4px; }
 .hero h1 { margin: 17px 0 14px; color: var(--navy); font-size: clamp(38px, 5vw, 68px); font-weight: 800; letter-spacing: -.065em; line-height: .98; }
+.hero h1 .product-name { color: var(--yellow); font-family: 'DM Mono', monospace; font-size: .28em; font-weight: 500; letter-spacing: .16em; vertical-align: middle; }
 .hero h1 em { color: var(--yellow); font-family: Georgia, serif; font-weight: 400; letter-spacing: -.08em; }
 .hero p { max-width: 580px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
 

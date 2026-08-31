@@ -2,7 +2,7 @@
   "name": "portmacsimoa",
   "version": "0.1.0",
   "private": true,
-  "description": "PORTMAC — Simulador de Custo de Operação Portuária. Núcleo de domínio.",
+  "description": "SCO — Simulador de Custo de Operação da PORTMAC.",
   "type": "module",
   "engines": {
     "node": ">=20"

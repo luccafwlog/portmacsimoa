@@ -1,4 +1,4 @@
-# PORTMAC — contexto do produto
+# SCO — Simulador de Custo de Operação
 
 Este repositório contém o núcleo de uma calculadora interna de custo para
 cotação preliminar. O resultado é um cenário calculado, não uma promessa sobre

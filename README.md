@@ -1,6 +1,6 @@
-# PORTMAC — Simulador de custo de operação
+# SCO — Simulador de Custo de Operação
 
-Núcleo de uma calculadora interna para cotações preliminares da PORTMAC.
+Calculadora interna para cotações preliminares da PORTMAC.
 
 O usuário informa uma faina, o início da operação, o volume, a produtividade
 total por período e o total de ternos da operação. O núcleo calcula a quantidade
