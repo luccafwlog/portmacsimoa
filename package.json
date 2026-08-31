@@ -1,0 +1,20 @@
+{
+  "name": "portmacsimoa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PORTMAC — Simulador de Custo de Operação Portuária. Núcleo de domínio.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

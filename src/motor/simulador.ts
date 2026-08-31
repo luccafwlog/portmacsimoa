@@ -1,0 +1,129 @@
+import type { CalendarioOgmo } from '../calendario/portas.js';
+import type { CatalogoOgmo } from '../catalogo/portas.js';
+import type {
+  EntradaDeSimulacao,
+  LinhaDeMemoria,
+  ResultadoDeSimulacao,
+} from '../dominio/tipos.js';
+
+export class EntradaInvalida extends Error {
+  constructor(mensagem: string) {
+    super(mensagem);
+    this.name = 'EntradaInvalida';
+  }
+}
+
+export class CatalogoIncompleto extends Error {
+  constructor(mensagem: string) {
+    super(mensagem);
+    this.name = 'CatalogoIncompleto';
+  }
+}
+
+export function simular(
+  entrada: EntradaDeSimulacao,
+  catalogo: CatalogoOgmo,
+  calendario: CalendarioOgmo,
+): ResultadoDeSimulacao {
+  validarEntrada(entrada);
+
+  const faina = catalogo.obterFaina(entrada.faina);
+  if (faina === undefined) {
+    throw new CatalogoIncompleto(`Faina ${entrada.faina} não está no catálogo.`);
+  }
+  if (faina.unidade !== 'TON') {
+    throw new CatalogoIncompleto(
+      `A faina ${entrada.faina} não está cadastrada em toneladas.`,
+    );
+  }
+
+  const quantidadeDePeriodos = Math.ceil(
+    entrada.volumeToneladas / entrada.produtividadeToneladasPorPeriodo,
+  );
+  const distribuicaoDeTernos = entrada.ternosPorPeriodo
+    ? validarDistribuicao(entrada.ternosPorPeriodo, quantidadeDePeriodos, entrada.totalDeTernos)
+    : distribuirTernos(entrada.totalDeTernos, quantidadeDePeriodos);
+  const periodos = calendario.projetar(entrada.inicio, quantidadeDePeriodos);
+  if (periodos.length !== quantidadeDePeriodos) {
+    throw new CatalogoIncompleto(
+      `O calendário retornou ${periodos.length} períodos, mas eram necessários ${quantidadeDePeriodos}.`,
+    );
+  }
+
+  let restante = entrada.volumeToneladas;
+  const calculados = periodos.map((periodo, indice) => {
+    const producaoToneladas = Math.min(
+      entrada.produtividadeToneladasPorPeriodo,
+      restante,
+    );
+    restante -= producaoToneladas;
+    const custo = catalogo.calcularCustoDoPeriodo({
+      faina,
+      periodo,
+      producaoToneladas,
+      ternos: distribuicaoDeTernos[indice]!,
+    });
+    return {
+      periodo,
+      producaoToneladas,
+      ternos: distribuicaoDeTernos[indice]!,
+      custo,
+    };
+  });
+
+  const custoTotal = calculados.reduce((total, periodo) => total + periodo.custo.total, 0);
+  const memoria: LinhaDeMemoria[] = [
+    { descricao: 'Volume total (toneladas)', valor: entrada.volumeToneladas },
+    { descricao: 'Produtividade (toneladas por período)', valor: entrada.produtividadeToneladasPorPeriodo },
+    { descricao: 'Quantidade de períodos', valor: quantidadeDePeriodos },
+    { descricao: 'Total de ternos', valor: entrada.totalDeTernos },
+  ];
+
+  return {
+    entrada,
+    quantidadeDePeriodos,
+    distribuicaoDeTernos,
+    periodos: calculados,
+    custoTotal,
+    custoPorTonelada: custoTotal / entrada.volumeToneladas,
+    memoria,
+  };
+}
+
+function validarEntrada(entrada: EntradaDeSimulacao): void {
+  if (!entrada.faina.trim()) throw new EntradaInvalida('A faina é obrigatória.');
+  if (entrada.volumeToneladas <= 0) {
+    throw new EntradaInvalida('O volume deve ser maior que zero.');
+  }
+  if (entrada.produtividadeToneladasPorPeriodo <= 0) {
+    throw new EntradaInvalida('A produtividade deve ser maior que zero.');
+  }
+  if (!Number.isInteger(entrada.totalDeTernos) || entrada.totalDeTernos < 1) {
+    throw new EntradaInvalida('O total de ternos deve ser um inteiro maior que zero.');
+  }
+}
+
+function distribuirTernos(total: number, periodos: number): readonly number[] {
+  const base = Math.floor(total / periodos);
+  const sobras = total % periodos;
+  return Array.from({ length: periodos }, (_, indice) =>
+    base + (indice >= periodos - sobras ? 1 : 0),
+  );
+}
+
+function validarDistribuicao(
+  distribuicao: readonly number[],
+  periodos: number,
+  total: number,
+): readonly number[] {
+  if (distribuicao.length !== periodos) {
+    throw new EntradaInvalida('A distribuição precisa ter um valor por período.');
+  }
+  if (distribuicao.some((ternos) => !Number.isInteger(ternos) || ternos < 0)) {
+    throw new EntradaInvalida('Cada distribuição de ternos deve ser um inteiro não negativo.');
+  }
+  if (distribuicao.reduce((soma, ternos) => soma + ternos, 0) !== total) {
+    throw new EntradaInvalida('A redistribuição deve preservar o total de ternos.');
+  }
+  return distribuicao;
+}
