@@ -38,15 +38,23 @@ terminologia aprovada.
 - **Instrumento** — `ACT` ou `CCT`. Determinado pelo par `(faina, categoria)`,
   com CCT como default imposto pela norma
   ([#9](https://github.com/luccafwlog/portmacsimoa/issues/9), resolvido).
-- **Terno** — frente de trabalho. Multiplica as posições de escala `POR_TERNO`
-  e não as de escala `POR_NAVIO`
+- **Terno** — frente de trabalho. Dimensiona a **equipe**: multiplica as posições
+  de escala `POR_TERNO` e não as de escala `POR_NAVIO`
   ([#16](https://github.com/luccafwlog/portmacsimoa/issues/16)).
+
+  **Terno não encurta a operação.** Quem dá a duração é a produtividade, e ela é
+  do navio. As duas entram separadas porque a relação entre elas não é linear e
+  quem sabe dela é o operador: se abrir o terceiro terno leva o navio de 400 para
+  550 t/período, é ele quem informa os dois números. O simulador não arbitra esse
+  ganho — arbitrar seria inventar produtividade, que é justamente o que ele não
+  faz.
 - **Período** — a jornada de 12 horas: 7h–19h (diurno) e 19h–7h (noturno). Dois
   por dia. É a unidade de requisição e a unidade em que o piso é avaliado.
-- **Produtividade** — quanto um terno move num período. É **input do operador**,
-  não dado de catálogo: quem cota conhece o navio, o guindaste e o berço. O
-  simulador é calculadora, não estimador. Decide quantos períodos existem e,
-  portanto, quantas vezes o piso é cobrado.
+- **Produtividade** — quanto **o navio inteiro** move num período, não quanto um
+  terno move. É **input do operador**, não dado de catálogo: quem cota conhece o
+  navio, o guindaste e o berço. O simulador é calculadora, não estimador.
+  Sozinha, ela decide a duração da operação — e portanto quantas vezes o piso é
+  cobrado.
 - **Cota** — o peso de uma função no cálculo da remuneração.
 - **Taxa homem / taxa equipe** — os dois regimes de remuneração. `Conferente =
   Taxa equipe · Demais = Taxa homem` (OBS do ANEXO I do ACT).
