@@ -116,8 +116,10 @@ td:first-child { color: var(--navy); font-family: 'DM Mono', monospace; font-siz
 td:nth-child(2) { color: var(--muted); }
 td:last-child { color: var(--navy); font-weight: 800; text-align: right; }
 th:last-child { text-align: right; }
-.ternos-input { width: 55px; height: 29px; padding: 0 7px; color: var(--navy); background: #fff; border: 1px solid var(--line); border-radius: 2px; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; text-align: center; outline: none; }
-.ternos-input:focus { border-color: var(--navy-2); box-shadow: 0 0 0 3px rgba(10, 65, 107, .11); }
+.ternos-control { display: flex; align-items: center; gap: 10px; min-width: 156px; }
+.ternos-input { width: 112px; height: 22px; accent-color: var(--navy-2); cursor: pointer; }
+.ternos-input:focus-visible { outline: 3px solid rgba(10, 65, 107, .18); outline-offset: 3px; }
+.ternos-value { display: grid; place-items: center; width: 28px; height: 28px; color: var(--navy); background: var(--yellow-soft); border: 1px solid #f4d88e; border-radius: 50%; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; }
 .distribution-status { margin: 0 24px 18px; padding: 9px 11px; color: #8e302b; background: #fff0ee; font-size: 10px; }
 .calculation-strip { display: flex; align-items: center; justify-content: space-between; padding: 17px 21px; background: var(--navy); color: #fff; }
 .strip-label { color: var(--yellow); font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: .12em; }

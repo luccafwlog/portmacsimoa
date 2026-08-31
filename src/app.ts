@@ -86,13 +86,26 @@ function render(resultado: ResultadoDeSimulacao): void {
     <tr>
       <td>${periodo.periodo.identificador}</td>
       <td>${number(periodo.producaoToneladas)} ton</td>
-      <td><input class="ternos-input" data-period-index="${periodo.periodo.indice}" type="number" min="0" step="1" value="${periodo.ternos}" aria-label="Ternos no ${periodo.periodo.identificador}" /></td>
+      <td>
+        <div class="ternos-control">
+          <input class="ternos-input" data-period-index="${periodo.periodo.indice}" type="range" min="1" max="3" step="1" value="${periodo.ternos}" aria-label="Ternos no ${periodo.periodo.identificador}" />
+          <output class="ternos-value" for="ternos-${periodo.periodo.indice}">${periodo.ternos}</output>
+        </div>
+      </td>
       <td>${money(periodo.custo.total)}</td>
     </tr>
   `).join('');
 
   body.querySelectorAll<HTMLInputElement>('.ternos-input').forEach((input) => {
-    input.addEventListener('input', () => applyDistribution());
+    input.id = `ternos-${input.dataset.periodIndex}`;
+    input.addEventListener('input', () => {
+      const value = input.closest('.ternos-control')?.querySelector<HTMLOutputElement>('.ternos-value');
+      if (value) {
+        value.value = input.value;
+        value.textContent = input.value;
+      }
+      applyDistribution();
+    });
   });
   distributionStatus.hidden = true;
 }
@@ -101,8 +114,8 @@ function applyDistribution(): void {
   if (!currentResult) return;
   const values = Array.from(document.querySelectorAll<HTMLInputElement>('.ternos-input')).map((input) => Number(input.value));
   const total = values.reduce((sum, value) => sum + value, 0);
-  if (values.some((value) => !Number.isInteger(value) || value < 0)) {
-    showDistributionError('Use apenas números inteiros não negativos.');
+  if (values.some((value) => !Number.isInteger(value) || value < 1 || value > 3)) {
+    showDistributionError('Cada período deve ter entre 1 e 3 ternos.');
     return;
   }
   if (total !== currentResult.entrada.totalDeTernos) {
