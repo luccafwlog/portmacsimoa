@@ -43,6 +43,10 @@ terminologia aprovada.
   ([#16](https://github.com/luccafwlog/portmacsimoa/issues/16)).
 - **Período** — a jornada de 12 horas: 7h–19h (diurno) e 19h–7h (noturno). Dois
   por dia. É a unidade de requisição e a unidade em que o piso é avaliado.
+- **Produtividade** — quanto um terno move num período. É **input do operador**,
+  não dado de catálogo: quem cota conhece o navio, o guindaste e o berço. O
+  simulador é calculadora, não estimador. Decide quantos períodos existem e,
+  portanto, quantas vezes o piso é cobrado.
 - **Cota** — o peso de uma função no cálculo da remuneração.
 - **Taxa homem / taxa equipe** — os dois regimes de remuneração. `Conferente =
   Taxa equipe · Demais = Taxa homem` (OBS do ANEXO I do ACT).
