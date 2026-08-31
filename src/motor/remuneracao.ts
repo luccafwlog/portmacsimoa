@@ -48,6 +48,8 @@ interface ContextoDoPeriodo {
   readonly producaoPorTerno: number;
   readonly quantidadeTotalDaCarga: number;
   readonly multiplicador: number;
+  /** 1 em período cheio; menor sob a política `EXATO`. */
+  readonly fracaoRequisitada: number;
 }
 
 /**
@@ -62,6 +64,13 @@ interface ContextoDoPeriodo {
  *
  * O tempo não multiplica o custo. O que ele faz é decidir quantos períodos
  * existem — e cada período requisitado carrega o piso, mesmo sem produção.
+ *
+ * Daí a fração de período incidir **só sobre o piso**, antes do `max`. O piso é
+ * a contrapartida de ter requisitado um período; requisitar meio período dá
+ * direito a meio piso. Já a remuneração por produção é do que foi produzido, e
+ * escaliná-la pelo tempo seria voltar ao modelo errado que o ADR 0002 descarta:
+ * quem moveu 100 toneladas recebe por 100 toneladas, tenha isso ocupado o
+ * período inteiro ou um décimo dele.
  */
 export function custoDaCategoriaNoPeriodo(
   remuneracao: Remuneracao,
@@ -73,7 +82,7 @@ export function custoDaCategoriaNoPeriodo(
     remuneracao.taxa,
     contexto.quantidadeTotalDaCarga,
   ).totalComEncargos;
-  const piso = remuneracao.salarioDia.totalComEncargos;
+  const piso = remuneracao.salarioDia.totalComEncargos * contexto.fracaoRequisitada;
   const trabalhadores = totalDeTrabalhadores(posicoes);
 
   if (trabalhadores === 0) {

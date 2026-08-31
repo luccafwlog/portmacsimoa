@@ -40,3 +40,10 @@ trabalhadores caíram no piso.
 - O rateio interno da taxa-equipe precisa ser calculado mesmo sendo irrelevante
   para o custo da PORTMAC — porque o piso é por trabalhador, e só o rateio diz
   se alguém ficou abaixo dele.
+- **Uma fração de período incide sobre o piso, nunca sobre a produção.** Sob a
+  política `EXATO`, meio período requisitado dá direito a meio salário-dia — o
+  piso é a contrapartida da requisição. Mas quem moveu 100 toneladas recebe por
+  100 toneladas, tenha isso ocupado a jornada inteira ou um décimo dela.
+  Escaliná-la pelo tempo reintroduziria pela porta dos fundos o modelo que este
+  ADR descarta. A duração publicada e os custos por período saem da soma das
+  frações, para que a linha do tempo não contradiga o que o resultado diz.

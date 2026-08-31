@@ -12,17 +12,20 @@ categoria e por instrumento coletivo.
 
 ```bash
 npm install
-npm test          # 57 testes-âncora sobre números conferidos no ACT
+npm test          # 68 testes-âncora sobre números conferidos no ACT
 npm run typecheck
 ```
 
 ## O que este código já faz
 
 ```ts
-import { CatalogoEmMemoria, CATALOGO_SEMENTE } from './src/catalogo/index.js';
-import { calendarioProvisorio } from './src/calendario/calendario.js';
-import { simular } from './src/motor/simulador.js';
-import { instante } from './src/dominio/tempo.js';
+import {
+  CATALOGO_SEMENTE,
+  CatalogoEmMemoria,
+  calendarioProvisorio,
+  instante,
+  simular,
+} from './src/index.js';
 
 const resultado = simular(
   {

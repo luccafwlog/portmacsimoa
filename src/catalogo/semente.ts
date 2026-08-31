@@ -45,14 +45,31 @@ export const VIGENCIA_ACT: Vigencia = {
   ate: data(2028, 6, 30),
 };
 
-const FAINAS: readonly Faina[] = [
-  { codigo: '5.1', descricao: 'Granito', unidade: 'TON' },
-  { codigo: '5.9', descricao: 'Produto Siderúrgico', unidade: 'TON' },
-  { codigo: '5.9-TT', descricao: 'Tubos e Trilhos', unidade: 'TON' },
-  { codigo: '7.5-VAZIO', descricao: 'LO-LO Contêiner Vazio', unidade: 'UND' },
-  { codigo: '7.5-CHEIO', descricao: 'LO-LO Contêiner Cheio', unidade: 'UND' },
-  { codigo: '7.5-MAQ', descricao: 'LO-LO Máquinas e Equipamentos', unidade: 'TON' },
-];
+/**
+ * A identidade da faina não expira junto com o acordo.
+ *
+ * O que o ACT fixa por dois anos é a *taxa*; que granito se mede em tonelada
+ * continua valendo depois de 30/06/2028. Por isso as fainas vigem sem termo —
+ * e quando a CCT sucessora renumerar ou mudar uma unidade, entra uma linha
+ * nova com início próprio, sem apagar a antiga.
+ */
+const VIGENCIA_DAS_FAINAS: Vigencia = { de: data(2026, 6, 1), ate: null };
+
+const FAINAS: readonly Faina[] = (
+  [
+    ['5.1', 'Granito', 'TON'],
+    ['5.9', 'Produto Siderúrgico', 'TON'],
+    ['5.9-TT', 'Tubos e Trilhos', 'TON'],
+    ['7.5-VAZIO', 'LO-LO Contêiner Vazio', 'UND'],
+    ['7.5-CHEIO', 'LO-LO Contêiner Cheio', 'UND'],
+    ['7.5-MAQ', 'LO-LO Máquinas e Equipamentos', 'TON'],
+  ] as const
+).map(([codigo, descricao, unidade]) => ({
+  codigo,
+  descricao,
+  unidade,
+  vigencia: VIGENCIA_DAS_FAINAS,
+}));
 
 /**
  * A matriz esparsa do #9: as exceções ACT sobre o default CCT.

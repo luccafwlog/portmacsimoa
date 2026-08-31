@@ -90,6 +90,15 @@ export interface Faina {
   readonly codigo: string;
   readonly descricao: string;
   readonly unidade: UnidadeDeMedida;
+  /**
+   * A identidade da faina também é datada.
+   *
+   * A CCT sucessora pode renumerar fainas ou mudar a unidade em que uma carga
+   * é medida. Sem vigência aqui, uma simulação antiga passaria a ser lida com a
+   * unidade nova — e mudar de `TON` para `UND` troca o significado do
+   * número-título inteiro.
+   */
+  readonly vigencia: Vigencia;
 }
 
 export interface PosicaoDeEquipe {
@@ -156,6 +165,14 @@ export interface CustoOpcional {
   readonly descricao: string;
   readonly tipo: 'VALOR_TOTAL' | 'POR_UNIDADE_DE_CARGA' | 'POR_PERIODO';
   readonly valor: number;
+  /**
+   * A qual carga o custo se prende, quando o tipo é `POR_UNIDADE_DE_CARGA`.
+   *
+   * Num navio misto, somar toneladas com contêineres para multiplicar por um
+   * preço unitário produz um número sem dimensão. Ou o custo diz de qual faina
+   * é, ou o navio inteiro precisa estar numa unidade só.
+   */
+  readonly faina?: string;
 }
 
 export interface CargaSimulada {

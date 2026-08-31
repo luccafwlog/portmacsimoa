@@ -72,6 +72,19 @@ export function somarDias(d: DataLocal, dias: number): DataLocal {
   return doDiaSerial(aoDiaSerial(d) + dias);
 }
 
+/** Avança um instante por N minutos, rolando o dia quando preciso. */
+export function somarMinutos(i: InstanteLocal, minutos: number): InstanteLocal {
+  const total = i.hora * 60 + i.minuto + Math.round(minutos);
+  const diasInteiros = Math.floor(total / 1440);
+  const restante = ((total % 1440) + 1440) % 1440;
+  const dia = somarDias(apenasData(i), diasInteiros);
+  return {
+    ...dia,
+    hora: Math.floor(restante / 60),
+    minuto: restante % 60,
+  };
+}
+
 export function diaDaSemana(d: DataLocal): DiaDaSemana {
   // 1970-01-01 foi uma quinta-feira.
   const indice = (((aoDiaSerial(d) + 4) % 7) + 7) % 7;

@@ -20,8 +20,11 @@ import { maisEspecifica, vigenteEm } from './vigencia.js';
 export class CatalogoEmMemoria implements Catalogo {
   constructor(private readonly dados: DadosDeCatalogo) {}
 
-  faina(codigo: string, _em: DataLocal): Faina | undefined {
-    return this.dados.fainas.find((f) => f.codigo === codigo);
+  faina(codigo: string, em: DataLocal): Faina | undefined {
+    return maisEspecifica(
+      this.dados.fainas.filter((f) => f.codigo === codigo),
+      em,
+    );
   }
 
   instrumentoAplicavel(

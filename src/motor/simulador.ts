@@ -1,4 +1,4 @@
-import { apenasData, type DataLocal } from '../dominio/tempo.js';
+import { apenasData, somarMinutos, type DataLocal } from '../dominio/tempo.js';
 import type {
   CargaSimulada,
   Categoria,
@@ -13,7 +13,7 @@ import type { Catalogo } from '../catalogo/portas.js';
 import type { CalendarioOgmo } from '../calendario/portas.js';
 import { dimensionarEquipe } from './equipe.js';
 import { POLITICAS_PADRAO, type Premissa, type PoliticasDeCalculo } from './politicas.js';
-import { projetarPeriodos } from './periodos.js';
+import { HORAS_POR_PERIODO, projetarPeriodos } from './periodos.js';
 import { custoDaCategoriaNoPeriodo, type Regime } from './remuneracao.js';
 import type {
   CustoDeCategoria,
@@ -121,6 +121,12 @@ export function simular(
 
   const custoMaoDeObra = periodos.reduce((s, p) => s + p.custo, 0);
 
+  // Sob CEIL toda fração é 1 e isto é a contagem de períodos. Sob EXATO a
+  // duração precisa sair das frações, senão a linha do tempo contradiz o
+  // `fracaoRequisitada` que o próprio resultado publica — e os custos por
+  // período seriam cobrados por uma jornada que não foi requisitada.
+  const duracaoEmPeriodos = periodos.reduce((s, p) => s + p.fracaoRequisitada, 0);
+
   // 3. Componentes que incidem sobre o montante de mão de obra.
   const custoDeAdministracaoOgmo = custoMaoDeObra * politicas.taxaDeAdministracaoOgmo;
   const custoDoFundoIndenizatorio = custoMaoDeObra * politicas.fundoIndenizatorio;
@@ -141,8 +147,8 @@ export function simular(
 
   const custosOpcionais = somarCustosOpcionais(
     entrada.custosOpcionais ?? [],
-    entrada.cargas,
-    totalDePeriodos,
+    planos,
+    duracaoEmPeriodos,
   );
   if ((entrada.custosOpcionais ?? []).length === 0) {
     premissas.registrar(
@@ -173,14 +179,17 @@ export function simular(
   registrarPremissasDePolitica(politicas, premissas);
 
   const ultimo = linhaDoTempo[linhaDoTempo.length - 1];
+  const ultimaFracao = periodos[periodos.length - 1]?.fracaoRequisitada ?? 1;
 
   return {
     entrada,
     politicas,
     dataDeReferenciaDoCatalogo: dataDeReferencia,
     inicio: linhaDoTempo[0]?.inicio ?? entrada.inicio,
-    terminoPrevisto: ultimo ? ultimo.fim : entrada.inicio,
-    duracaoEmPeriodos: totalDePeriodos,
+    terminoPrevisto: ultimo
+      ? somarMinutos(ultimo.inicio, ultimaFracao * HORAS_POR_PERIODO * 60)
+      : entrada.inicio,
+    duracaoEmPeriodos,
     custoMaoDeObra,
     custoDeAdministracaoOgmo,
     custoDoFundoIndenizatorio,
@@ -353,11 +362,12 @@ function custoDoPeriodo(
         producaoPorTerno: producao / ternos,
         quantidadeTotalDaCarga: plano.carga.quantidade,
         multiplicador: janela.multiplicador,
+        fracaoRequisitada: fracao,
       },
       politicas,
     );
 
-    const custoDaCategoria = parcial.custo * fracao;
+    const custoDaCategoria = parcial.custo;
     custo += custoDaCategoria;
     porCategoria.push({
       categoria,
@@ -389,13 +399,18 @@ function custoDoPeriodo(
  *
  * `POR_PERIODO` cobre locação de máquina, que é custo de tempo e por isso só
  * pode ser somado depois de a duração estar calculada — daí a ordem.
+ *
+ * `POR_UNIDADE_DE_CARGA` exige saber *de qual carga*. Num navio que mistura
+ * toneladas e contêineres, somar as duas quantidades para multiplicar por um
+ * preço unitário devolve um número sem dimensão — e grande. Ou o custo aponta
+ * a faina, ou o navio inteiro está numa unidade só; qualquer outro caso é
+ * recusado em vez de virar cotação.
  */
 function somarCustosOpcionais(
   custos: readonly CustoOpcional[],
-  cargas: readonly CargaSimulada[],
+  planos: readonly PlanoDeCarga[],
   periodos: number,
 ): number {
-  const quantidadeTotal = cargas.reduce((s, c) => s + c.quantidade, 0);
   let total = 0;
   for (const custo of custos) {
     switch (custo.tipo) {
@@ -403,7 +418,7 @@ function somarCustosOpcionais(
         total += custo.valor;
         break;
       case 'POR_UNIDADE_DE_CARGA':
-        total += custo.valor * quantidadeTotal;
+        total += custo.valor * quantidadeAlvo(custo, planos);
         break;
       case 'POR_PERIODO':
         total += custo.valor * periodos;
@@ -411,6 +426,29 @@ function somarCustosOpcionais(
     }
   }
   return total;
+}
+
+function quantidadeAlvo(
+  custo: CustoOpcional,
+  planos: readonly PlanoDeCarga[],
+): number {
+  if (custo.faina !== undefined) {
+    const plano = planos.find((p) => p.carga.faina === custo.faina);
+    if (plano === undefined) {
+      throw new EntradaInvalida(
+        `O custo opcional "${custo.descricao}" aponta a faina ${custo.faina}, que não está nesta simulação.`,
+      );
+    }
+    return plano.carga.quantidade;
+  }
+
+  const unidades = new Set(planos.map((p) => p.unidade));
+  if (unidades.size > 1) {
+    throw new EntradaInvalida(
+      `O custo opcional "${custo.descricao}" é por unidade de carga, mas o navio mistura ${[...unidades].join(' e ')}. Informe a faina a que ele se refere.`,
+    );
+  }
+  return planos.reduce((s, p) => s + p.carga.quantidade, 0);
 }
 
 function montarIndicadores(

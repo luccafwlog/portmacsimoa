@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { instante } from '../src/dominio/tempo.js';
+import { data, instante } from '../src/dominio/tempo.js';
 import { CatalogoEmMemoria } from '../src/catalogo/memoria.js';
 import { CATALOGO_SEMENTE } from '../src/catalogo/semente.js';
 import { calendarioProvisorio } from '../src/calendario/calendario.js';
 import { comPoliticas } from '../src/motor/politicas.js';
 import { CatalogoIncompleto, EntradaInvalida, simular } from '../src/motor/simulador.js';
-import type { EntradaDeSimulacao } from '../src/dominio/tipos.js';
+import type { EntradaDeSimulacao, Vigencia } from '../src/dominio/tipos.js';
 
 const catalogo = new CatalogoEmMemoria(CATALOGO_SEMENTE);
 const calendario = calendarioProvisorio(2026, 2028);
@@ -160,6 +160,166 @@ describe('períodos requisitados e não realizados', () => {
       comPoliticas({ arredondamentoDePeriodos: 'EXATO' }),
     );
     expect(exato.custoMaoDeObra).toBeLessThan(inteiro.custoMaoDeObra);
+  });
+});
+
+/**
+ * A fração de período incide sobre o piso, nunca sobre a produção.
+ *
+ * O piso é a contrapartida de ter requisitado o período: meio período, meio
+ * piso. A remuneração por produção é do que foi produzido — escaliná-la pelo
+ * tempo seria voltar ao modelo que o ADR 0002 descarta.
+ *
+ * Cenário: 1.100 ton a 1.000/período sob EXATO. O segundo período move 100 ton
+ * e vale 0,1 de período. O piso proporcional cai para R$ 41,01, abaixo do que a
+ * produção paga, então a produção manda e é cobrada por inteiro.
+ */
+describe('a fração de período sob EXATO', () => {
+  const exato = simular(
+    granito(1100, 1000, 1),
+    catalogo,
+    calendario,
+    comPoliticas({ arredondamentoDePeriodos: 'EXATO' }),
+  );
+  const sobra = exato.periodos[1];
+
+  it('não desconta a produção já realizada no período parcial', () => {
+    expect(sobra?.fracaoRequisitada).toBeCloseTo(0.1, 9);
+    expect(sobra?.producao).toBeCloseTo(100, 9);
+
+    // Estiva: 0,99 × 7,5 cotas × 100 ton × 1,25 (noturno) = R$ 928,125.
+    // Conferência: 3,01 × 100 × 1,25 = R$ 376,25.
+    const porCategoria = Object.fromEntries(
+      (sobra?.porCategoria ?? []).map((c) => [c.categoria, c.custo]),
+    );
+    expect(porCategoria['ESTIVADORES']).toBeCloseTo(928.125, 6);
+    expect(porCategoria['CONFERENTES']).toBeCloseTo(376.25, 6);
+  });
+
+  it('a produção venceu o piso proporcional, então ninguém ficou no piso', () => {
+    expect(sobra?.porCategoria.every((c) => c.trabalhadoresNoPiso === 0)).toBe(true);
+  });
+
+  it('a duração e o término saem das frações, não da contagem arredondada', () => {
+    expect(exato.duracaoEmPeriodos).toBeCloseTo(1.1, 9);
+    // O segundo período abre às 19h; 0,1 de uma jornada de 12h são 1h12.
+    expect(exato.terminoPrevisto).toEqual(instante(2026, 7, 6, 20, 12));
+  });
+
+  it('sob CEIL a duração continua inteira e o término fecha a jornada', () => {
+    const inteiro = simular(granito(1100, 1000, 1), catalogo, calendario);
+    expect(inteiro.duracaoEmPeriodos).toBe(2);
+    expect(inteiro.terminoPrevisto).toEqual(instante(2026, 7, 7, 7, 0));
+  });
+});
+
+/**
+ * Custos opcionais por unidade de carga precisam de uma unidade (#5, #17).
+ *
+ * O catálogo semente só tem faina em tonelada, então o navio misto aqui é uma
+ * montagem de teste: duas fainas triviais, uma em TON e outra em UND.
+ */
+describe('custo opcional por unidade num navio misto', () => {
+  const vigencia: Vigencia = { de: data(2026, 1, 1), ate: null };
+  const um = { base: 1, totalComEncargos: 1 };
+  const mistas = new CatalogoEmMemoria({
+    fainas: [
+      { codigo: 'T', descricao: 'Carga em tonelada', unidade: 'TON', vigencia },
+      { codigo: 'U', descricao: 'Carga em unidade', unidade: 'UND', vigencia },
+    ],
+    coberturas: [],
+    composicoes: ['T', 'U'].map((faina) => ({
+      instrumento: 'CCT' as const,
+      faina,
+      categoria: 'ESTIVADORES' as const,
+      vigencia,
+      posicoes: [
+        { funcao: 'Porão', quantidade: 1, cota: 1, escala: 'POR_TERNO' as const },
+      ],
+    })),
+    remuneracoes: ['T', 'U'].map((faina) => ({
+      instrumento: 'CCT' as const,
+      faina,
+      categoria: 'ESTIVADORES' as const,
+      unidadeDaTaxa: 'POR_HOMEM' as const,
+      taxa: { tipo: 'LINEAR' as const, valor: um },
+      salarioDia: um,
+      vigencia,
+    })),
+  });
+
+  function navioMisto(custo: EntradaDeSimulacao['custosOpcionais']) {
+    return simular(
+      {
+        cargas: [
+          { faina: 'T', quantidade: 100, produtividadePorTernoPorPeriodo: 100 },
+          { faina: 'U', quantidade: 10, produtividadePorTernoPorPeriodo: 10 },
+        ],
+        ternos: 1,
+        inicio: SEGUNDA_DE_MANHA,
+        ...(custo === undefined ? {} : { custosOpcionais: custo }),
+      },
+      mistas,
+      calendario,
+    );
+  }
+
+  it('recusa um custo por unidade que não diz de qual carga é', () => {
+    expect(() =>
+      navioMisto([
+        { descricao: 'Material de peação', tipo: 'POR_UNIDADE_DE_CARGA', valor: 5 },
+      ]),
+    ).toThrow(EntradaInvalida);
+  });
+
+  it('multiplica só a quantidade da faina apontada', () => {
+    const resultado = navioMisto([
+      {
+        descricao: 'Material de peação',
+        tipo: 'POR_UNIDADE_DE_CARGA',
+        valor: 5,
+        faina: 'U',
+      },
+    ]);
+    // 10 contêineres × R$ 5,00 — não 110 × 5, que somaria tonelada com unidade.
+    expect(resultado.custosOpcionais).toBeCloseTo(50, 6);
+  });
+
+  it('recusa um custo que aponta faina ausente da simulação', () => {
+    expect(() =>
+      navioMisto([
+        {
+          descricao: 'Madeira',
+          tipo: 'POR_UNIDADE_DE_CARGA',
+          valor: 5,
+          faina: 'Z',
+        },
+      ]),
+    ).toThrow(EntradaInvalida);
+  });
+
+  it('num navio de unidade única a faina é dispensável', () => {
+    const resultado = simular(
+      {
+        ...granito(1000, 1000, 1),
+        custosOpcionais: [
+          { descricao: 'Içamento', tipo: 'POR_UNIDADE_DE_CARGA', valor: 2 },
+        ],
+      },
+      catalogo,
+      calendario,
+    );
+    expect(resultado.custosOpcionais).toBeCloseTo(2000, 6);
+  });
+
+  it('não entrega um R$/ton único num navio misto', () => {
+    const resultado = navioMisto(undefined);
+    expect(resultado.indicadorPrincipal).toBeNull();
+    expect(resultado.indicadores.map((i) => i.rotulo).sort()).toEqual([
+      'R$/ton',
+      'R$/und',
+    ]);
+    expect(resultado.premissas.map((p) => p.codigo)).toContain('NAVIO_MISTO');
   });
 });
 
