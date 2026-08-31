@@ -119,20 +119,34 @@ describe('simulador mínimo', () => {
     expect(resultado.periodos.map((p) => p.ternos)).toEqual([1, 2]);
   });
 
-  it('exige pelo menos um terno por período', () => {
-    expect(() => simular(
-      { ...entrada, volumeToneladas: 30, produtividadeToneladasPorPeriodo: 10, totalDeTernos: 2 },
+  it('aceita períodos sem terno quando a distribuição preserva o total', () => {
+    const resultado = simular(
+      {
+        ...entrada,
+        volumeToneladas: 20,
+        produtividadeToneladasPorPeriodo: 10,
+        totalDeTernos: 1,
+        ternosPorPeriodo: [0, 1],
+      },
       catalogo,
       calendario,
-    )).toThrow('pelo menos 1 terno');
+    );
+
+    expect(resultado.distribuicaoDeTernos).toEqual([0, 1]);
   });
 
-  it('limita a distribuição a três ternos por período', () => {
+  it('limita a distribuição a quatro ternos por período', () => {
     expect(() => simular(
       { ...entrada, volumeToneladas: 20, produtividadeToneladasPorPeriodo: 10, totalDeTernos: 7 },
       catalogo,
       calendario,
-    )).toThrow('máximo de 3 ternos');
+    )).not.toThrow();
+
+    expect(() => simular(
+      { ...entrada, volumeToneladas: 20, produtividadeToneladasPorPeriodo: 10, totalDeTernos: 9 },
+      catalogo,
+      calendario,
+    )).toThrow('máximo de 4 ternos');
   });
 
   it('soma custos opcionais ao total e calcula seu valor por tonelada', () => {

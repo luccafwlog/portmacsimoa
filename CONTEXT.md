@@ -25,7 +25,8 @@ o custo final nem uma previsão automática da operação.
   ternos.
 - **Terno** — unidade inteira de recurso que pode ser distribuída entre os
   períodos da operação. O usuário informa o total; o sistema cria uma
-  distribuição equilibrada e permite uma redistribuição manual posterior.
+  distribuição equilibrada e permite uma redistribuição manual posterior de 0
+  a 4 ternos por período.
 - **Catálogo do OGMO** — fonte externa dos valores e regras necessários para
   calcular o custo de um período. Cada faina cadastrada mantém sua fonte,
   vigência e referência documental. Não existe preço criado pelo usuário.
@@ -40,8 +41,8 @@ o custo final nem uma previsão automática da operação.
 4. O volume é distribuído pela produtividade; o último período pode ser
    parcial, mas continua sendo um período inteiro requisitado.
 5. Os ternos são distribuídos como inteiros e equilibrados. Uma distribuição
-   explícita só é aceita se tiver a mesma quantidade de períodos e a mesma soma
-   do total informado.
+   explícita aceita de 0 a 4 ternos por período e só é aceita se tiver a mesma
+   quantidade de períodos e a mesma soma do total informado.
 6. O calendário do OGMO projeta os períodos e o catálogo documental calcula
    cada custo. A resolução da faina segue ACT e, somente quando necessário,
    CCT.

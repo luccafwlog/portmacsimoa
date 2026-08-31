@@ -142,7 +142,7 @@ function render(resultado: ResultadoDeSimulacao): void {
       <td>${number(periodo.producaoToneladas)} ton</td>
       <td>
         <div class="ternos-control">
-          <input class="ternos-input" data-period-index="${periodo.periodo.indice}" type="range" min="1" max="3" step="1" value="${periodo.ternos}" aria-label="Ternos no ${periodo.periodo.identificador}" />
+          <input class="ternos-input" data-period-index="${periodo.periodo.indice}" type="range" min="0" max="4" step="1" value="${periodo.ternos}" aria-label="Ternos no ${periodo.periodo.identificador}" />
           <output class="ternos-value" for="ternos-${periodo.periodo.indice}">${periodo.ternos}</output>
         </div>
       </td>
@@ -168,8 +168,8 @@ function applyDistribution(): void {
   if (!currentResult) return;
   const values = Array.from(document.querySelectorAll<HTMLInputElement>('.ternos-input')).map((input) => Number(input.value));
   const total = values.reduce((sum, value) => sum + value, 0);
-  if (values.some((value) => !Number.isInteger(value) || value < 1 || value > 3)) {
-    showDistributionError('Cada período deve ter entre 1 e 3 ternos.');
+  if (values.some((value) => !Number.isInteger(value) || value < 0 || value > 4)) {
+    showDistributionError('Cada período deve ter entre 0 e 4 ternos.');
     return;
   }
   if (total !== currentResult.entrada.totalDeTernos) {

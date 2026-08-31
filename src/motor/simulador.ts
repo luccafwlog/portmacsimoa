@@ -41,14 +41,9 @@ export function simular(
   const quantidadeDePeriodos = Math.ceil(
     entrada.volumeToneladas / entrada.produtividadeToneladasPorPeriodo,
   );
-  if (entrada.totalDeTernos < quantidadeDePeriodos) {
+  if (entrada.totalDeTernos > quantidadeDePeriodos * 4) {
     throw new EntradaInvalida(
-      'O total de ternos precisa permitir pelo menos 1 terno em cada período.',
-    );
-  }
-  if (entrada.totalDeTernos > quantidadeDePeriodos * 3) {
-    throw new EntradaInvalida(
-      'O total de ternos excede o máximo de 3 ternos por período.',
+      'O total de ternos excede o máximo de 4 ternos por período.',
     );
   }
   const distribuicaoDeTernos = entrada.ternosPorPeriodo
@@ -148,8 +143,8 @@ function validarDistribuicao(
   if (distribuicao.length !== periodos) {
     throw new EntradaInvalida('A distribuição precisa ter um valor por período.');
   }
-  if (distribuicao.some((ternos) => !Number.isInteger(ternos) || ternos < 1 || ternos > 3)) {
-    throw new EntradaInvalida('Cada distribuição de ternos deve ser um inteiro entre 1 e 3.');
+  if (distribuicao.some((ternos) => !Number.isInteger(ternos) || ternos < 0 || ternos > 4)) {
+    throw new EntradaInvalida('Cada distribuição de ternos deve ser um inteiro entre 0 e 4.');
   }
   if (distribuicao.reduce((soma, ternos) => soma + ternos, 0) !== total) {
     throw new EntradaInvalida('A redistribuição deve preservar o total de ternos.');
