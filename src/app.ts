@@ -164,9 +164,9 @@ function addCustomCost(): void {
     <div class="optional-cost-item custom-cost-item">
       <div class="custom-cost-heading">
         <label class="toggle-row">
-          <input class="cost-toggle" type="checkbox" checked data-cost-type="OUTRO" data-cost-input="${amountId}" data-cost-description="${descriptionId}" />
+          <input class="cost-toggle" type="checkbox" checked aria-label="Ativar custo personalizado" data-cost-type="OUTRO" data-cost-input="${amountId}" data-cost-description="${descriptionId}" />
           <span class="toggle-switch" aria-hidden="true"></span>
-          <span>Outro custo ${suffix}</span>
+          <span class="custom-cost-state">Ativo</span>
         </label>
         <button class="remove-custom-cost" type="button">Remover</button>
       </div>

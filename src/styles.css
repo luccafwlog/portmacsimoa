@@ -103,6 +103,7 @@ button { cursor: pointer; }
 .custom-cost-list { display: grid; gap: 10px; margin-top: 10px; }
 .custom-cost-item { border: 1px solid var(--line); }
 .custom-cost-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.custom-cost-state { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 9px; text-transform: uppercase; }
 .remove-custom-cost { padding: 0; color: var(--muted); background: transparent; border: 0; font-family: 'DM Mono', monospace; font-size: 9px; cursor: pointer; text-transform: uppercase; }
 .remove-custom-cost:hover { color: #8e302b; }
 .secondary-button { width: 100%; min-height: 36px; margin-top: 10px; color: var(--navy-2); background: transparent; border: 1px dashed #b6c8cb; border-radius: 2px; font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; transition: border-color .2s, color .2s, background .2s; }
