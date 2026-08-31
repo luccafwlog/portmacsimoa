@@ -113,7 +113,8 @@ table { width: 100%; border-collapse: collapse; font-size: 11px; }
 th { padding: 10px 24px; color: var(--muted); background: #f7faf9; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 400; letter-spacing: .04em; text-align: left; text-transform: uppercase; }
 td { padding: 13px 24px; color: var(--ink); border-top: 1px solid var(--line); white-space: nowrap; }
 td:first-child { color: var(--navy); font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500; }
-td:nth-child(2) { color: var(--muted); }
+td:nth-child(2), td:nth-child(3) { color: var(--muted); }
+td:nth-child(2) { font-family: 'DM Mono', monospace; font-size: 10px; }
 td:last-child { color: var(--navy); font-weight: 800; text-align: right; }
 th:last-child { text-align: right; }
 .ternos-control { display: flex; align-items: center; gap: 10px; min-width: 156px; }

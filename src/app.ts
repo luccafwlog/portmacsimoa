@@ -1,8 +1,8 @@
 import './styles.css';
-import { data } from './dominio/tempo.js';
-import type { CalendarioOgmo } from './calendario/portas.js';
+import { data, formatarDataPtBr } from './dominio/tempo.js';
+import { calendarioDemo } from './calendario/demo.js';
 import type { CatalogoOgmo } from './catalogo/portas.js';
-import type { EntradaDeSimulacao, PeriodoOgmo, ResultadoDeSimulacao } from './dominio/tipos.js';
+import type { EntradaDeSimulacao, ResultadoDeSimulacao } from './dominio/tipos.js';
 import { simular } from './motor/simulador.js';
 
 const demoCatalogo: CatalogoOgmo = {
@@ -15,17 +15,6 @@ const demoCatalogo: CatalogoOgmo = {
       total: custo,
       memoria: [{ descricao: 'Custo fictício do catálogo de demonstração', valor: custo }],
     };
-  },
-};
-
-const demoCalendario: CalendarioOgmo = {
-  projetar(inicio, quantidade) {
-    return Array.from({ length: quantidade }, (_, indice): PeriodoOgmo => ({
-      indice,
-      data: inicio.data,
-      identificador: indice === 0 ? inicio.periodo : `P${indice + 1}`,
-      multiplicador: [1, 1.25, 1.5, 1.75][indice % 4]!,
-    }));
   },
 };
 
@@ -50,7 +39,7 @@ function recalculate(distribution?: readonly number[]): void {
   clearError();
   try {
     const entrada = readInput(distribution);
-    currentResult = simular(entrada, demoCatalogo, demoCalendario);
+    currentResult = simular(entrada, demoCatalogo, calendarioDemo);
     render(currentResult);
   } catch (error) {
     showError(error instanceof Error ? error.message : 'Não foi possível calcular este cenário.');
@@ -85,6 +74,7 @@ function render(resultado: ResultadoDeSimulacao): void {
   body.innerHTML = resultado.periodos.map((periodo) => `
     <tr>
       <td>${periodo.periodo.identificador}</td>
+      <td>${formatarDataPtBr(periodo.periodo.data)}</td>
       <td>${number(periodo.producaoToneladas)} ton</td>
       <td>
         <div class="ternos-control">

@@ -7,9 +7,10 @@ o custo final nem uma previsão automática da operação.
 ## Vocabulário decidido
 
 - **Faina** — a operação que será cotada. Uma simulação trata uma única faina.
-- **Período** — a unidade de tempo usada pelo OGMO. Sua duração, seus nomes e
-  seus multiplicadores vêm do catálogo/calendário oficial; o núcleo não os
-  inventa.
+- **Período** — uma das quatro faixas diárias da operação: `01-07`, `07-13`,
+  `13-19` ou `19-01`. Cada período é apresentado junto da sua data de início;
+  o período `19-01` termina no dia seguinte. Valores e regras de custo ainda
+  vêm do catálogo/calendário oficial.
 - **Produtividade** — quantidade total que a operação deve movimentar em um
   período. É informada pelo usuário e não é multiplicada automaticamente pelos
   ternos.
@@ -25,14 +26,16 @@ o custo final nem uma previsão automática da operação.
 1. O usuário informa faina, data e período de início, volume, produtividade e
    total de ternos.
 2. O núcleo calcula `ceil(volume / produtividade)` períodos.
-3. O volume é distribuído pela produtividade; o último período pode ser
+3. A partir da data e da faixa inicial, o calendário avança quatro períodos por
+   dia e informa a data de início de cada período.
+4. O volume é distribuído pela produtividade; o último período pode ser
    parcial, mas continua sendo um período inteiro requisitado.
-4. Os ternos são distribuídos como inteiros e equilibrados. Uma distribuição
+5. Os ternos são distribuídos como inteiros e equilibrados. Uma distribuição
    explícita só é aceita se tiver a mesma quantidade de períodos e a mesma soma
    do total informado.
-5. O calendário do OGMO projeta os períodos e o catálogo do OGMO calcula cada
+6. O calendário do OGMO projeta os períodos e o catálogo do OGMO calcula cada
    custo.
-6. O resultado mostra custo total, custo por tonelada e memória simples por
+7. O resultado mostra custo total, custo por tonelada e memória simples por
    período.
 
 ## Limites do primeiro núcleo
@@ -44,7 +47,7 @@ o custo final nem uma previsão automática da operação.
 - sem relação automática entre quantidade de ternos e produtividade;
 - sem regras de jornada, adicionais, pisos ou valores codificados antes da
   conferência do catálogo do OGMO;
-- sem UI, banco, autenticação ou histórico.
+- sem banco, autenticação ou histórico.
 
 O catálogo fictício usado nos testes serve somente para validar a arquitetura.
 Ele não representa uma cotação oficial.
