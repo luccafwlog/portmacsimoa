@@ -17,7 +17,10 @@ precisa permanecer igual ao total informado.
 As regras e os valores do OGMO entram por duas portas: `CatalogoOgmo` fornece a
 faina e calcula o custo de cada período; `CalendarioOgmo` projeta os períodos a
 partir de uma data e de um identificador de período. Os detalhes oficiais ainda
-estão pendentes e não são substituídos por valores inventados no núcleo.
+estão pendentes e não são substituídos por valores inventados no núcleo. O
+levantamento da CCT 2024/2026 já está visível no catálogo por grupo e código da
+tabela, mas suas regras continuam bloqueadas até a substituição completa do
+catálogo.
 
 ## Desenvolvimento
 

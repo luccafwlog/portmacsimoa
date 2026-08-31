@@ -29,7 +29,10 @@ o custo final nem uma previsão automática da operação.
   a 4 ternos por período.
 - **Catálogo do OGMO** — fonte externa dos valores e regras necessários para
   calcular o custo de um período. Cada faina cadastrada mantém sua fonte,
-  vigência e referência documental. Não existe preço criado pelo usuário.
+  vigência e referência documental. A CCT pode ter códigos repetidos entre
+  grupos de tabela; nesses casos, o cadastro usa grupo e código juntos. Uma
+  faina transcrita, mas ainda não validada, fica visível no catálogo e fora da
+  simulação. Não existe preço criado pelo usuário.
 
 ## Fluxo decidido
 
@@ -69,7 +72,8 @@ o custo final nem uma previsão automática da operação.
   conferida do catálogo do OGMO;
 - sem banco, autenticação ou histórico.
 
-O catálogo da aplicação contém uma primeira fatia da ACT para granito, produto
-siderúrgico e tubos/trilhos. As demais fainas e o fallback CCT serão adicionados
-somente após conferência de suas taxas, unidades e equipes; os catálogos falsos
-dos testes servem apenas para validar o motor.
+O catálogo da aplicação contém uma primeira fatia validada da ACT para granito,
+produto siderúrgico e tubos/trilhos. O levantamento da CCT 2024/2026 foi
+cadastrado por grupo e código de tabela, com unidades identificadas, mas suas
+regras permanecem pendentes até a substituição completa do catálogo. Os
+catálogos falsos dos testes servem apenas para validar o motor.

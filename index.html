@@ -168,7 +168,7 @@
           <section class="results-column" aria-live="polite">
             <div id="catalog-status-banner" class="catalog-banner">
               <span class="catalog-icon">⌁</span>
-              <span><strong>Catálogo ACT inicial</strong> · fainas cadastradas com taxas documentais; CCT será ampliada para os casos não previstos na ACT.</span>
+              <span><strong>Catálogo documental em expansão</strong> · ACT inicial habilitada para cálculo; fainas da CCT transcritas e aguardando validação das regras.</span>
             </div>
             <div id="error" class="error-message" role="alert" hidden></div>
 
@@ -294,7 +294,7 @@
         <section class="hero secondary-hero">
           <div class="eyebrow">BASE DE CUSTOS <span>·</span> DOCUMENTOS VIGENTES</div>
           <h1>Catálogo <em>de fainas</em></h1>
-          <p>Veja as fainas cadastradas, a fonte documental e as regras usadas pelo simulador para compor a mão de obra.</p>
+          <p>Veja as fainas cadastradas, a fonte documental, a unidade e o estado de validação da regra de custo.</p>
         </section>
 
         <div class="catalog-stats">
@@ -311,12 +311,12 @@
           <div class="table-wrap catalog-table-wrap">
             <table class="catalog-table">
               <thead>
-                <tr><th>Faina / tipo de carga</th><th>Fonte</th><th>Estiva</th><th>Equipe</th><th>Conferentes</th><th>Referência</th></tr>
+                <tr><th>Faina / tipo de carga</th><th>Grupo / vigência</th><th>Fonte / estado</th><th>Unidade</th><th>Regra de custo</th><th>Referência</th></tr>
               </thead>
               <tbody id="catalog-table-body"></tbody>
             </table>
           </div>
-          <div class="catalog-note"><span class="note-mark">i</span><p>A faina é cadastrada no sistema. A ACT é consultada primeiro; a CCT será usada apenas para fainas não previstas na ACT. Custos opcionais padrão vinculados a fainas serão adicionados posteriormente.</p></div>
+          <div class="catalog-note"><span class="note-mark">i</span><p>As fainas da CCT foram levantadas por grupo e código de tabela para evitar colisões. Registros pendentes ficam visíveis para conferência, mas não aparecem na nova simulação até que sua regra de custo seja validada.</p></div>
         </section>
       </main>
     </div>

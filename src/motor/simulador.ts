@@ -32,6 +32,11 @@ export function simular(
   if (faina === undefined) {
     throw new CatalogoIncompleto(`Faina ${entrada.faina} não está no catálogo.`);
   }
+  if (faina.status === 'PENDENTE_DE_VALIDACAO') {
+    throw new CatalogoIncompleto(
+      `A faina ${faina.descricao} está cadastrada, mas ainda não está validada para cálculo.`,
+    );
+  }
   if (faina.unidade !== 'TON') {
     throw new CatalogoIncompleto(
       `A faina ${entrada.faina} não está cadastrada em toneladas.`,

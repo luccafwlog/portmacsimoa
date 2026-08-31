@@ -1,6 +1,8 @@
 import type { DataLocal } from './tempo.js';
 
-export type UnidadeDeMedida = 'TON';
+export type UnidadeDeMedida = 'TON' | 'VOLUME' | 'UNIDADE' | 'CONTAINER' | 'INDEFINIDA';
+
+export type StatusDaFaina = 'VALIDADA' | 'PENDENTE_DE_VALIDACAO';
 
 export type FonteDoCatalogo = 'ACT' | 'CCT';
 
@@ -40,10 +42,16 @@ export interface EntradaDeSimulacao {
 
 export interface FainaCatalogada {
   readonly codigo: string;
+  /** Código único no catálogo; na CCT inclui o grupo da tabela. */
+  readonly codigoDaTabela?: string;
+  /** Grupo/tabela de origem quando a fonte é a CCT. */
+  readonly grupoDaTabela?: string;
   readonly descricao: string;
   readonly tipoDeCarga: string;
   readonly unidade: UnidadeDeMedida;
   readonly fonte: FonteDoCatalogo;
+  /** Registros pendentes ficam visíveis no catálogo, mas não entram na simulação. */
+  readonly status?: StatusDaFaina;
   readonly vigencia: string;
   readonly referencia: string;
 }

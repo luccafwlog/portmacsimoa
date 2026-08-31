@@ -15,7 +15,7 @@ export interface RegraDeCustoPorTonelada {
 }
 
 export interface RegistroDeFaina extends FainaCatalogada {
-  readonly regra: RegraDeCustoPorTonelada;
+  readonly regra?: RegraDeCustoPorTonelada;
 }
 
 /**
@@ -70,8 +70,9 @@ export const fainasActIniciais: readonly RegistroDeFaina[] = [
   },
 ];
 
-/** A CCT será adicionada somente para fainas não cobertas pela ACT. */
-export const fainasCctIniciais: readonly RegistroDeFaina[] = [];
+/** A CCT é transcrita como cadastro documental; suas regras serão validadas na substituição do catálogo. */
+export { fainasCctIniciais } from './cct.js';
+import { fainasCctIniciais } from './cct.js';
 
 export class CatalogoPortmac implements CatalogoOgmo {
   constructor(
@@ -102,6 +103,9 @@ export class CatalogoPortmac implements CatalogoOgmo {
     const faina = this.obterRegistro(contexto.faina.codigo);
     if (!faina) {
       throw new Error(`Faina ${contexto.faina.codigo} não está no catálogo.`);
+    }
+    if (faina.status === 'PENDENTE_DE_VALIDACAO' || !faina.regra) {
+      throw new Error(`A faina ${faina.descricao} ainda está pendente de validação.`);
     }
 
     const custoEstiva =

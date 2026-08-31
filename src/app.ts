@@ -60,19 +60,26 @@ function renderCatalogPage(): void {
   setText('#catalog-count', String(registros.length));
   setText('#catalog-act-count', String(actCount));
   setText('#catalog-cct-count', String(cctCount));
-  tableBody.innerHTML = registros.map((registro) => `
+  tableBody.innerHTML = registros.map((registro) => {
+    const regra = registro.regra;
+    const status = registro.status === 'PENDENTE_DE_VALIDACAO' || !regra
+      ? '<span class="pending-pill">Pendente</span><small>aguarda validação</small>'
+      : `<span class="ready-pill">Disponível</span><small>regra habilitada</small>`;
+    return `
     <tr>
-      <td><strong>${escapeHtml(registro.descricao)}</strong><small>${escapeHtml(registro.tipoDeCarga)}</small></td>
-      <td><span class="source-pill source-${registro.fonte.toLowerCase()}">${registro.fonte}</span><small>${escapeHtml(registro.vigencia)}</small></td>
-      <td><span class="rule-value">${money(registro.regra.taxaEstivaPorTonelada)}</span><small>taxa estiva / ton / cota</small></td>
-      <td><span class="rule-value">${number(registro.regra.cotasEstivaPorTerno)}</span><small>cotas por terno</small></td>
-      <td><span class="rule-value">${money(registro.regra.taxaConferentesPorTonelada)}</span><small>conferentes / ton</small></td>
+      <td><strong>${escapeHtml(registro.descricao)}</strong><small>${escapeHtml(registro.tipoDeCarga)} · código ${escapeHtml(registro.codigoDaTabela ?? registro.codigo)}</small></td>
+      <td><span class="catalog-group">${escapeHtml(registro.grupoDaTabela ?? 'Catálogo ACT')}</span><small>${escapeHtml(registro.vigencia)}</small></td>
+      <td><span class="source-pill source-${registro.fonte.toLowerCase()}">${registro.fonte}</span>${status}</td>
+      <td><span class="rule-value">${escapeHtml(registro.unidade)}</span><small>unidade da tabela</small></td>
+      <td>${regra ? `<span class="rule-value">${money(regra.taxaEstivaPorTonelada)}</span><small>estiva / ton / cota · ${number(regra.cotasEstivaPorTerno)} cotas/terno · conferentes ${money(regra.taxaConferentesPorTonelada)} / ton</small>` : '<span class="pending-rule">Regra não habilitada</span><small>transcrição documental</small>'}</td>
       <td><small>${escapeHtml(registro.referencia)}</small></td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 fainaInput.innerHTML = catalogoPortmac.listarFainas()
+  .filter((faina) => faina.status !== 'PENDENTE_DE_VALIDACAO')
   .map((faina) => `<option value="${faina.codigo}">${faina.descricao} · ${faina.fonte}</option>`)
   .join('');
 

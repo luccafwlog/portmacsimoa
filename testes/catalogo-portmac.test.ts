@@ -4,6 +4,7 @@ import type { PeriodoOgmo } from '../src/dominio/tipos.js';
 import {
   CatalogoPortmac,
   fainasActIniciais,
+  fainasCctIniciais,
   type RegistroDeFaina,
 } from '../src/catalogo/portmac.js';
 
@@ -46,5 +47,30 @@ describe('catálogo documental do PORTMAC', () => {
 
     expect(custo.total).toBeCloseTo(104.35, 2);
     expect(custo.memoria[2]?.descricao).toContain('ACT');
+  });
+
+  it('cadastra o levantamento CCT com identificadores compostos e sem colisões', () => {
+    expect(fainasCctIniciais.length).toBeGreaterThan(100);
+    expect(new Set(fainasCctIniciais.map((faina) => faina.codigo)).size)
+      .toBe(fainasCctIniciais.length);
+    expect(fainasCctIniciais.every((faina) => faina.fonte === 'CCT'))
+      .toBe(true);
+    expect(fainasCctIniciais.every((faina) => faina.status === 'PENDENTE_DE_VALIDACAO'))
+      .toBe(true);
+
+    const codigoRepetido = fainasCctIniciais.filter((faina) => faina.codigoDaTabela === '2.1');
+    expect(new Set(codigoRepetido.map((faina) => faina.grupoDaTabela)).size).toBeGreaterThan(1);
+  });
+
+  it('não calcula uma faina CCT que ainda está pendente', () => {
+    const catalogo = new CatalogoPortmac(fainasActIniciais, fainasCctIniciais);
+    const faina = fainasCctIniciais[0]!;
+
+    expect(() => catalogo.calcularCustoDoPeriodo({
+      faina,
+      periodo,
+      producaoToneladas: 10,
+      ternos: 1,
+    })).toThrow('pendente de validação');
   });
 });
