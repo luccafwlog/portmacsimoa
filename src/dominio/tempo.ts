@@ -117,6 +117,12 @@ export function formatarData(d: DataLocal): string {
   return `${d.ano}-${mm}-${dd}`;
 }
 
+export function formatarDataPtBr(d: DataLocal): string {
+  const mm = String(d.mes).padStart(2, '0');
+  const dd = String(d.dia).padStart(2, '0');
+  return `${dd}/${mm}/${d.ano}`;
+}
+
 export function formatarInstante(i: InstanteLocal): string {
   const hh = String(i.hora).padStart(2, '0');
   const mi = String(i.minuto).padStart(2, '0');

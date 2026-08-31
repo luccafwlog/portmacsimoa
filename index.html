@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#062f52" />
+    <title>SCO · Simulador de Custo de Operação</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#/nova-simulacao" aria-label="PORTMAC início">
+          <img src="/brand/portmac-blue.png" alt="PORTMAC" />
+        </a>
+        <nav class="main-nav" aria-label="Navegação principal">
+          <a data-route="nova-simulacao" href="#/nova-simulacao">Nova simulação</a>
+          <a data-route="clientes" href="#/clientes">Clientes cadastrados</a>
+          <a data-route="catalogo" href="#/catalogo">Catálogo de fainas</a>
+        </nav>
+        <div class="topbar-meta">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span>ambiente interno</span>
+        </div>
+      </header>
+
+      <main id="page-nova-simulacao" class="page" data-page="nova-simulacao">
+        <section class="hero">
+          <div class="eyebrow">COTAÇÃO PRELIMINAR <span>·</span> PORTO DE VITÓRIA</div>
+          <h1><span class="product-name">SCO</span><br /><em>Simulador de Custo</em><br />de Operação</h1>
+          <p>Monte um cenário, veja quantos períodos ele ocupa e ajuste os ternos quando a operação pedir outra distribuição.</p>
+        </section>
+
+        <div class="workspace-grid">
+          <section class="panel input-panel" aria-labelledby="dados-title">
+            <div class="panel-heading">
+              <div>
+                <span class="section-index">01</span>
+                <h2 id="dados-title">Dados da operação</h2>
+              </div>
+              <span class="required-note">todos os campos são obrigatórios</span>
+            </div>
+
+            <form id="simulation-form">
+              <label class="field field-wide">
+                <span>Faina / tipo de carga</span>
+                <select id="faina" required></select>
+                <small>selecionada no catálogo documental vigente</small>
+              </label>
+
+              <label class="field field-wide">
+                <span>Cliente da cotação <b>opcional</b></span>
+                <input id="cliente" type="text" maxlength="120" autocomplete="organization" placeholder="Nome do cliente" />
+                <small>identifica o cenário; não altera o cálculo</small>
+              </label>
+
+              <div class="field-row">
+                <label class="field">
+                  <span>Data de início</span>
+                  <input id="data" type="date" value="2026-09-04" required />
+                </label>
+                <label class="field">
+                  <span>Período de início</span>
+                  <select id="periodo" required>
+                    <option value="01-07">01-07 · primeiro período</option>
+                    <option value="07-13">07-13 · segundo período</option>
+                    <option value="13-19">13-19 · terceiro período</option>
+                    <option value="19-01">19-01 · quarto período</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="field-row">
+                <label class="field">
+                  <span>Volume do navio <b>ton</b></span>
+                  <input id="volume" type="number" min="0.01" step="0.01" value="105" required />
+                </label>
+                <label class="field">
+                  <span>Produtividade <b>ton / período</b></span>
+                  <input id="produtividade" type="number" min="0.01" step="0.01" value="10" required />
+                </label>
+              </div>
+
+              <div class="period-preview" aria-live="polite">
+                <div>
+                  <span class="preview-label">TOTAL DE PERÍODOS CALCULADOS</span>
+                  <small>volume ÷ produtividade, arredondado para cima</small>
+                </div>
+                <strong id="calculated-periods">11</strong>
+              </div>
+
+              <label class="field field-wide">
+                <span>Total de ternos</span>
+                <input id="total-ternos" type="number" min="1" step="1" value="22" required />
+                <small>distribuição equilibrada automática; você pode ajustar depois</small>
+              </label>
+
+              <section class="optional-costs" aria-labelledby="optional-costs-title">
+                <div class="optional-costs-heading">
+                  <div>
+                    <span class="section-index">+</span>
+                    <h2 id="optional-costs-title">Custos opcionais</h2>
+                  </div>
+                  <span class="optional-note">não obrigatórios</span>
+                </div>
+                <p class="optional-caption">Ative um item para informar o custo total. O SCO divide esse valor pelo volume do navio.</p>
+                <div class="optional-cost-list">
+                  <div class="optional-cost-item">
+                    <label class="toggle-row">
+                      <input class="cost-toggle" type="checkbox" data-cost-type="MATERIAL_DE_PEACAO" data-cost-input="cost-material-de-pecao" />
+                      <span class="toggle-switch" aria-hidden="true"></span>
+                      <span>Material de peação</span>
+                    </label>
+                    <label class="optional-input" for="cost-material-de-pecao" hidden>
+                      <span>Custo total <b>R$</b></span>
+                      <input id="cost-material-de-pecao" type="number" min="0" step="0.01" placeholder="0,00" disabled />
+                    </label>
+                  </div>
+                  <div class="optional-cost-item">
+                    <label class="toggle-row">
+                      <input class="cost-toggle" type="checkbox" data-cost-type="MADEIRA" data-cost-input="cost-madeira" />
+                      <span class="toggle-switch" aria-hidden="true"></span>
+                      <span>Madeira</span>
+                    </label>
+                    <label class="optional-input" for="cost-madeira" hidden>
+                      <span>Custo total <b>R$</b></span>
+                      <input id="cost-madeira" type="number" min="0" step="0.01" placeholder="0,00" disabled />
+                    </label>
+                  </div>
+                  <div class="optional-cost-item">
+                    <label class="toggle-row">
+                      <input class="cost-toggle" type="checkbox" data-cost-type="LOCACAO_DE_MAQUINA" data-cost-input="cost-locacao-de-maquina" />
+                      <span class="toggle-switch" aria-hidden="true"></span>
+                      <span>Locação de máquina</span>
+                    </label>
+                    <label class="optional-input" for="cost-locacao-de-maquina" hidden>
+                      <span>Custo total <b>R$</b></span>
+                      <input id="cost-locacao-de-maquina" type="number" min="0" step="0.01" placeholder="0,00" disabled />
+                    </label>
+                  </div>
+                  <div class="optional-cost-item">
+                    <label class="toggle-row">
+                      <input class="cost-toggle" type="checkbox" data-cost-type="MATERIAL_DE_ICAMENTO" data-cost-input="cost-material-de-icamento" />
+                      <span class="toggle-switch" aria-hidden="true"></span>
+                      <span>Material de içamento</span>
+                    </label>
+                    <label class="optional-input" for="cost-material-de-icamento" hidden>
+                      <span>Custo total <b>R$</b></span>
+                      <input id="cost-material-de-icamento" type="number" min="0" step="0.01" placeholder="0,00" disabled />
+                    </label>
+                  </div>
+                </div>
+                <div id="custom-cost-list" class="custom-cost-list"></div>
+                <button id="add-custom-cost" class="secondary-button" type="button">Adicionar custo</button>
+              </section>
+
+              <div class="form-note">
+                <span class="note-mark">i</span>
+                <p>A produtividade é a produção total esperada da operação por período. O simulador não a multiplica pelos ternos.</p>
+              </div>
+
+              <button class="primary-button" type="submit">
+                <span>Calcular cenário</span>
+                <span class="button-arrow" aria-hidden="true">↗</span>
+              </button>
+            </form>
+          </section>
+
+          <section class="results-column" aria-live="polite">
+            <div id="catalog-status-banner" class="catalog-banner">
+              <span class="catalog-icon">⌁</span>
+              <span><strong>Catálogo documental em expansão</strong> · ACT inicial habilitada para cálculo; fainas da CCT transcritas e aguardando validação das regras.</span>
+            </div>
+            <div id="error" class="error-message" role="alert" hidden></div>
+
+            <section id="empty-state" class="panel empty-state">
+              <div class="empty-mark">↘</div>
+              <h2>Seu cenário aparece aqui</h2>
+              <p>Preencha os dados ao lado para enxergar o custo por período e o total da operação.</p>
+            </section>
+
+            <section id="result-state" class="result-state" hidden>
+              <div class="result-intro">
+                <div>
+                  <span class="eyebrow">RESULTADO DO CENÁRIO</span>
+                  <h2 id="result-faina">Granito</h2>
+                  <p id="result-client" class="result-client">Cliente não informado</p>
+                </div>
+                <span id="result-source" class="result-chip">ACT · 2026/2028</span>
+              </div>
+
+              <div class="metrics-grid">
+                <div class="metric metric-primary">
+                  <span>Custo por tonelada</span>
+                  <strong id="cost-per-ton">R$ 0,00</strong>
+                  <small>número de referência</small>
+                </div>
+                <div class="metric">
+                  <span>Custo total</span>
+                  <strong id="cost-total">R$ 0,00</strong>
+                  <small>operação completa</small>
+                </div>
+                <div class="metric">
+                  <span>Períodos calculados</span>
+                  <strong id="period-count">0</strong>
+                  <small>requisitados</small>
+                </div>
+              </div>
+
+              <section class="panel cost-breakdown" aria-labelledby="cost-breakdown-title">
+                <div class="panel-heading cost-breakdown-heading">
+                  <div>
+                    <span class="section-index">03</span>
+                    <h2 id="cost-breakdown-title">Composição do custo</h2>
+                  </div>
+                  <span class="sum-badge">mão de obra + opcionais</span>
+                </div>
+                <div class="cost-lines">
+                  <div class="cost-line">
+                    <div><span>Mão de obra</span><small id="labor-cost-per-ton">R$ 0,00 / ton</small></div>
+                    <strong id="labor-cost-total">R$ 0,00</strong>
+                  </div>
+                  <div id="optional-cost-lines"></div>
+                  <div class="cost-line cost-line-total">
+                    <div><span>Custo total da operação</span><small>valor final do cenário</small></div>
+                    <strong id="composed-cost-total">R$ 0,00</strong>
+                  </div>
+                </div>
+              </section>
+
+              <details class="panel periods-panel">
+                <summary class="panel-heading periods-summary">
+                  <div>
+                    <span class="section-index">02</span>
+                    <h2>Detalhamento por ternos</h2>
+                  </div>
+                  <div class="periods-summary-meta">
+                    <span class="sum-badge">total: <strong id="ternos-total-label">0</strong> ternos</span>
+                    <span class="expand-hint" aria-hidden="true"><span class="expand-label"></span><span class="expand-icon">⌄</span></span>
+                  </div>
+                </summary>
+                <div class="periods-content">
+                  <p class="panel-caption">Ajuste os ternos por período para testar outro cenário. Use de 0 a 4 ternos; a soma precisa permanecer igual.</p>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr><th>Período</th><th>Data de início</th><th>Produção</th><th>Ternos</th><th>Mão de obra</th></tr>
+                      </thead>
+                      <tbody id="periods-body"></tbody>
+                    </table>
+                  </div>
+                  <div id="distribution-status" class="distribution-status" hidden></div>
+                </div>
+              </details>
+
+              <section class="calculation-strip">
+                <div>
+                  <span class="strip-label">MEMÓRIA DO CÁLCULO</span>
+                  <p id="calculation-summary">105 ton ÷ 10 ton/período = 11 períodos</p>
+                </div>
+                <span class="strip-arrow">→</span>
+              </section>
+            </section>
+          </section>
+        </div>
+
+        <footer class="footer-note">
+          <span>PORTMAC · simulador de custo de operação</span>
+          <span><i></i> catálogo ACT inicial · CCT em ampliação</span>
+        </footer>
+      </main>
+
+      <main id="page-clientes" class="page secondary-page" data-page="clientes" hidden>
+        <section class="hero secondary-hero">
+          <div class="eyebrow">RELACIONAMENTO <span>·</span> HISTÓRICO</div>
+          <h1>Clientes <em>cadastrados</em></h1>
+          <p>Consulte as simulações e os orçamentos realizados para cada cliente em um só lugar.</p>
+        </section>
+
+        <section class="panel page-card">
+          <div class="panel-heading">
+            <div><span class="section-index">01</span><h2>Registro de clientes e cotações</h2></div>
+            <span class="required-note">em breve</span>
+          </div>
+          <div class="page-empty-state">
+            <div class="empty-mark">⌁</div>
+            <h2>O histórico começa aqui</h2>
+            <p>Esta página será o ponto de consulta das simulações e orçamentos vinculados a cada cliente. A nova simulação continua disponível para criar o próximo cenário.</p>
+            <a class="secondary-button page-action" href="#/nova-simulacao">Criar nova simulação <span>↗</span></a>
+          </div>
+        </section>
+      </main>
+
+      <main id="page-catalogo" class="page secondary-page" data-page="catalogo" hidden>
+        <section class="hero secondary-hero">
+          <div class="eyebrow">BASE DE CUSTOS <span>·</span> DOCUMENTOS VIGENTES</div>
+          <h1>Catálogo <em>de fainas</em></h1>
+          <p>Veja as fainas cadastradas, a fonte documental, a unidade e o estado de validação da regra de custo.</p>
+        </section>
+
+        <div class="catalog-stats">
+          <div class="catalog-stat"><span>FAINAS CADASTRADAS</span><strong id="catalog-count">0</strong></div>
+          <div class="catalog-stat"><span>ORIGEM ACT</span><strong id="catalog-act-count">0</strong></div>
+          <div class="catalog-stat"><span>ORIGEM CCT</span><strong id="catalog-cct-count">0</strong></div>
+        </div>
+
+        <section class="panel page-card catalog-card">
+          <div class="panel-heading">
+            <div><span class="section-index">01</span><h2>Fainas e regras de cálculo</h2></div>
+            <span class="required-note">ACT prioritária</span>
+          </div>
+          <div class="table-wrap catalog-table-wrap">
+            <table class="catalog-table">
+              <thead>
+                <tr><th>Faina / tipo de carga</th><th>Grupo / vigência</th><th>Fonte / estado</th><th>Unidade</th><th>Regra de custo</th><th>Referência</th></tr>
+              </thead>
+              <tbody id="catalog-table-body"></tbody>
+            </table>
+          </div>
+          <div class="catalog-note"><span class="note-mark">i</span><p>As fainas da CCT foram levantadas por grupo e código de tabela para evitar colisões. Registros pendentes ficam visíveis para conferência, mas não aparecem na nova simulação até que sua regra de custo seja validada.</p></div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/src/app.ts"></script>
+  </body>
+</html>
