@@ -44,6 +44,12 @@
                 <small>catálogo de demonstração</small>
               </label>
 
+              <label class="field field-wide">
+                <span>Cliente da cotação <b>opcional</b></span>
+                <input id="cliente" type="text" maxlength="120" autocomplete="organization" placeholder="Nome do cliente" />
+                <small>identifica o cenário; não altera o cálculo</small>
+              </label>
+
               <div class="field-row">
                 <label class="field">
                   <span>Data de início</span>
@@ -115,6 +121,7 @@
                 <div>
                   <span class="eyebrow">RESULTADO DO CENÁRIO</span>
                   <h2 id="result-faina">Granito</h2>
+                  <p id="result-client" class="result-client">Cliente não informado</p>
                 </div>
                 <span class="result-chip">cenário manual</span>
               </div>

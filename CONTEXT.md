@@ -6,6 +6,8 @@ o custo final nem uma previsão automática da operação.
 
 ## Vocabulário decidido
 
+- **Cliente** — nome opcional usado para identificar a cotação. Não altera o
+  cálculo do cenário.
 - **Faina** — a operação que será cotada. Uma simulação trata uma única faina.
 - **Período** — uma das quatro faixas diárias da operação: `01-07`, `07-13`,
   `13-19` ou `19-01`. Cada período é apresentado junto da sua data de início;
@@ -23,8 +25,8 @@ o custo final nem uma previsão automática da operação.
 
 ## Fluxo decidido
 
-1. O usuário informa faina, data e período de início, volume, produtividade e
-   total de ternos.
+1. O usuário informa opcionalmente o cliente e informa faina, data e período de
+   início, volume, produtividade e total de ternos.
 2. O núcleo calcula `ceil(volume / produtividade)` períodos.
 3. A partir da data e da faixa inicial, o calendário avança quatro períodos por
    dia e informa a data de início de cada período.

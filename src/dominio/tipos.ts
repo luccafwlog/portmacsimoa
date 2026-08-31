@@ -9,6 +9,8 @@ export interface InicioDaOperacao {
 }
 
 export interface EntradaDeSimulacao {
+  /** Identificação opcional da cotação; não participa do cálculo. */
+  readonly cliente?: string;
   readonly faina: string;
   readonly inicio: InicioDaOperacao;
   readonly volumeToneladas: number;

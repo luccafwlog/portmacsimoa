@@ -49,7 +49,9 @@ function recalculate(distribution?: readonly number[]): void {
 function readInput(distribution?: readonly number[]): EntradaDeSimulacao {
   const dateValue = valueOf<HTMLInputElement>('#data');
   const [ano, mes, dia] = dateValue.split('-').map(Number);
+  const cliente = valueOf<HTMLInputElement>('#cliente').trim();
   return {
+    ...(cliente ? { cliente } : {}),
     faina: valueOf<HTMLSelectElement>('#faina'),
     inicio: { data: data(ano!, mes!, dia!), periodo: valueOf<HTMLSelectElement>('#periodo') },
     volumeToneladas: numberOf('#volume'),
@@ -63,6 +65,7 @@ function render(resultado: ResultadoDeSimulacao): void {
   emptyState.hidden = true;
   resultState.hidden = false;
   setText('#result-faina', resultado.entrada.faina === 'GRANITO' ? 'Granito' : resultado.entrada.faina);
+  setText('#result-client', resultado.entrada.cliente ? `Cliente: ${resultado.entrada.cliente}` : 'Cliente não informado');
   setText('#cost-per-ton', money(resultado.custoPorTonelada));
   setText('#cost-total', money(resultado.custoTotal));
   setText('#period-count', String(resultado.quantidadeDePeriodos));
