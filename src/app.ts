@@ -16,6 +16,8 @@ const productivityInput = document.querySelector<HTMLInputElement>('#produtivida
 const costToggles = document.querySelectorAll<HTMLInputElement>('.cost-toggle');
 const customCostList = document.querySelector<HTMLDivElement>('#custom-cost-list')!;
 const addCustomCostButton = document.querySelector<HTMLButtonElement>('#add-custom-cost')!;
+const pages = document.querySelectorAll<HTMLElement>('[data-page]');
+const routeLinks = document.querySelectorAll<HTMLAnchorElement>('[data-route]');
 let currentResult: ResultadoDeSimulacao | undefined;
 let customCostCounter = 0;
 
@@ -26,6 +28,49 @@ const optionalCostLabels: Record<TipoDeCustoOpcional, string> = {
   MATERIAL_DE_ICAMENTO: 'Material de içamento',
   OUTRO: 'Outro custo',
 };
+
+type AppRoute = 'nova-simulacao' | 'clientes' | 'catalogo';
+
+function routeFromHash(): AppRoute {
+  const route = window.location.hash.replace(/^#\/?/, '').split('/')[0];
+  return route === 'clientes' || route === 'catalogo' ? route : 'nova-simulacao';
+}
+
+function renderRoute(route: AppRoute): void {
+  pages.forEach((page) => { page.hidden = page.dataset.page !== route; });
+  routeLinks.forEach((link) => {
+    const active = link.dataset.route === route;
+    link.classList.toggle('active', active);
+    if (active) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  });
+  if (route === 'catalogo') renderCatalogPage();
+  document.title = route === 'nova-simulacao'
+    ? 'SCO · Nova simulação'
+    : route === 'clientes' ? 'SCO · Clientes cadastrados' : 'SCO · Catálogo de fainas';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderCatalogPage(): void {
+  const registros = catalogoPortmac.listarRegistros();
+  const tableBody = document.querySelector<HTMLTableSectionElement>('#catalog-table-body')!;
+  const actCount = registros.filter((registro) => registro.fonte === 'ACT').length;
+  const cctCount = registros.filter((registro) => registro.fonte === 'CCT').length;
+
+  setText('#catalog-count', String(registros.length));
+  setText('#catalog-act-count', String(actCount));
+  setText('#catalog-cct-count', String(cctCount));
+  tableBody.innerHTML = registros.map((registro) => `
+    <tr>
+      <td><strong>${escapeHtml(registro.descricao)}</strong><small>${escapeHtml(registro.tipoDeCarga)}</small></td>
+      <td><span class="source-pill source-${registro.fonte.toLowerCase()}">${registro.fonte}</span><small>${escapeHtml(registro.vigencia)}</small></td>
+      <td><span class="rule-value">${money(registro.regra.taxaEstivaPorTonelada)}</span><small>taxa estiva / ton / cota</small></td>
+      <td><span class="rule-value">${number(registro.regra.cotasEstivaPorTerno)}</span><small>cotas por terno</small></td>
+      <td><span class="rule-value">${money(registro.regra.taxaConferentesPorTonelada)}</span><small>conferentes / ton</small></td>
+      <td><small>${escapeHtml(registro.referencia)}</small></td>
+    </tr>
+  `).join('');
+}
 
 fainaInput.innerHTML = catalogoPortmac.listarFainas()
   .map((faina) => `<option value="${faina.codigo}">${faina.descricao} · ${faina.fonte}</option>`)
@@ -40,6 +85,8 @@ productivityInput.addEventListener('input', updateCalculatedPeriods);
 costToggles.forEach((toggle) => toggle.addEventListener('change', () => updateOptionalCostInput(toggle)));
 addCustomCostButton.addEventListener('click', addCustomCost);
 updateCalculatedPeriods();
+window.addEventListener('hashchange', () => renderRoute(routeFromHash()));
+renderRoute(routeFromHash());
 
 function recalculate(distribution?: readonly number[]): void {
   clearError();

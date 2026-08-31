@@ -9,16 +9,21 @@
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <a class="brand" href="/" aria-label="PORTMAC início">
+        <a class="brand" href="#/nova-simulacao" aria-label="PORTMAC início">
           <img src="/brand/portmac-blue.png" alt="PORTMAC" />
         </a>
+        <nav class="main-nav" aria-label="Navegação principal">
+          <a data-route="nova-simulacao" href="#/nova-simulacao">Nova simulação</a>
+          <a data-route="clientes" href="#/clientes">Clientes cadastrados</a>
+          <a data-route="catalogo" href="#/catalogo">Catálogo de fainas</a>
+        </nav>
         <div class="topbar-meta">
           <span class="status-dot" aria-hidden="true"></span>
           <span>ambiente interno</span>
         </div>
       </header>
 
-      <main class="page">
+      <main id="page-nova-simulacao" class="page" data-page="nova-simulacao">
         <section class="hero">
           <div class="eyebrow">COTAÇÃO PRELIMINAR <span>·</span> PORTO DE VITÓRIA</div>
           <h1><span class="product-name">SCO</span><br /><em>Simulador de Custo</em><br />de Operação</h1>
@@ -262,6 +267,57 @@
           <span>PORTMAC · simulador de custo de operação</span>
           <span><i></i> catálogo ACT inicial · CCT em ampliação</span>
         </footer>
+      </main>
+
+      <main id="page-clientes" class="page secondary-page" data-page="clientes" hidden>
+        <section class="hero secondary-hero">
+          <div class="eyebrow">RELACIONAMENTO <span>·</span> HISTÓRICO</div>
+          <h1>Clientes <em>cadastrados</em></h1>
+          <p>Consulte as simulações e os orçamentos realizados para cada cliente em um só lugar.</p>
+        </section>
+
+        <section class="panel page-card">
+          <div class="panel-heading">
+            <div><span class="section-index">01</span><h2>Registro de clientes e cotações</h2></div>
+            <span class="required-note">em breve</span>
+          </div>
+          <div class="page-empty-state">
+            <div class="empty-mark">⌁</div>
+            <h2>O histórico começa aqui</h2>
+            <p>Esta página será o ponto de consulta das simulações e orçamentos vinculados a cada cliente. A nova simulação continua disponível para criar o próximo cenário.</p>
+            <a class="secondary-button page-action" href="#/nova-simulacao">Criar nova simulação <span>↗</span></a>
+          </div>
+        </section>
+      </main>
+
+      <main id="page-catalogo" class="page secondary-page" data-page="catalogo" hidden>
+        <section class="hero secondary-hero">
+          <div class="eyebrow">BASE DE CUSTOS <span>·</span> DOCUMENTOS VIGENTES</div>
+          <h1>Catálogo <em>de fainas</em></h1>
+          <p>Veja as fainas cadastradas, a fonte documental e as regras usadas pelo simulador para compor a mão de obra.</p>
+        </section>
+
+        <div class="catalog-stats">
+          <div class="catalog-stat"><span>FAINAS CADASTRADAS</span><strong id="catalog-count">0</strong></div>
+          <div class="catalog-stat"><span>ORIGEM ACT</span><strong id="catalog-act-count">0</strong></div>
+          <div class="catalog-stat"><span>ORIGEM CCT</span><strong id="catalog-cct-count">0</strong></div>
+        </div>
+
+        <section class="panel page-card catalog-card">
+          <div class="panel-heading">
+            <div><span class="section-index">01</span><h2>Fainas e regras de cálculo</h2></div>
+            <span class="required-note">ACT prioritária</span>
+          </div>
+          <div class="table-wrap catalog-table-wrap">
+            <table class="catalog-table">
+              <thead>
+                <tr><th>Faina / tipo de carga</th><th>Fonte</th><th>Estiva</th><th>Equipe</th><th>Conferentes</th><th>Referência</th></tr>
+              </thead>
+              <tbody id="catalog-table-body"></tbody>
+            </table>
+          </div>
+          <div class="catalog-note"><span class="note-mark">i</span><p>A faina é cadastrada no sistema. A ACT é consultada primeiro; a CCT será usada apenas para fainas não previstas na ACT. Custos opcionais padrão vinculados a fainas serão adicionados posteriormente.</p></div>
+        </section>
       </main>
     </div>
     <script type="module" src="/src/app.ts"></script>

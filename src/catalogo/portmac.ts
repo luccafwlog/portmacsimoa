@@ -80,7 +80,11 @@ export class CatalogoPortmac implements CatalogoOgmo {
   ) {}
 
   listarFainas(): readonly FainaCatalogada[] {
-    const fainas = new Map<string, FainaCatalogada>();
+    return this.listarRegistros();
+  }
+
+  listarRegistros(): readonly RegistroDeFaina[] {
+    const fainas = new Map<string, RegistroDeFaina>();
     for (const faina of [...this.fainasAct, ...this.fainasCct]) {
       // ACT sempre vence quando os dois instrumentos possuem o mesmo código.
       if (!fainas.has(faina.codigo) || faina.fonte === 'ACT') {

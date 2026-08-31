@@ -48,6 +48,16 @@ o custo final nem uma previsão automática da operação.
 7. O resultado mostra custo total, custo por tonelada e memória simples por
    período. O custo final soma a mão de obra aos custos opcionais informados.
 
+## Arquitetura de páginas
+
+- **Nova simulação** é a página principal e concentra a montagem do cenário.
+- **Clientes cadastrados** será o ponto de consulta do histórico de simulações
+  e orçamentos associados a cada cliente.
+- **Catálogo de fainas** detalha as fainas cadastradas, sua fonte (ACT ou CCT),
+  vigência e regra de cálculo.
+- A navegação atual é uma composição simples de páginas no cliente. Ainda não
+  existe persistência de clientes, simulações ou orçamentos.
+
 ## Limites do primeiro núcleo
 
 - uma faina por simulação;
