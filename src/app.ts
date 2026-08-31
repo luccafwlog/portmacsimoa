@@ -34,12 +34,17 @@ const errorBox = document.querySelector<HTMLDivElement>('#error')!;
 const emptyState = document.querySelector<HTMLElement>('#empty-state')!;
 const resultState = document.querySelector<HTMLElement>('#result-state')!;
 const distributionStatus = document.querySelector<HTMLDivElement>('#distribution-status')!;
+const volumeInput = document.querySelector<HTMLInputElement>('#volume')!;
+const productivityInput = document.querySelector<HTMLInputElement>('#produtividade')!;
 let currentResult: ResultadoDeSimulacao | undefined;
 
 form.addEventListener('submit', (event) => {
   event.preventDefault();
   recalculate();
 });
+volumeInput.addEventListener('input', updateCalculatedPeriods);
+productivityInput.addEventListener('input', updateCalculatedPeriods);
+updateCalculatedPeriods();
 
 function recalculate(distribution?: readonly number[]): void {
   clearError();
@@ -72,6 +77,7 @@ function render(resultado: ResultadoDeSimulacao): void {
   setText('#cost-per-ton', money(resultado.custoPorTonelada));
   setText('#cost-total', money(resultado.custoTotal));
   setText('#period-count', String(resultado.quantidadeDePeriodos));
+  setText('#calculated-periods', String(resultado.quantidadeDePeriodos));
   setText('#ternos-total-label', String(resultado.entrada.totalDeTernos));
   setText('#calculation-summary', `${number(resultado.entrada.volumeToneladas)} ton ÷ ${number(resultado.entrada.produtividadeToneladasPorPeriodo)} ton/período = ${resultado.quantidadeDePeriodos} períodos`);
 
@@ -109,6 +115,13 @@ function applyDistribution(): void {
 function showDistributionError(message: string): void {
   distributionStatus.textContent = message;
   distributionStatus.hidden = false;
+}
+
+function updateCalculatedPeriods(): void {
+  const volume = Number(volumeInput.value);
+  const productivity = Number(productivityInput.value);
+  const periods = volume > 0 && productivity > 0 ? Math.ceil(volume / productivity) : '—';
+  setText('#calculated-periods', String(periods));
 }
 
 function valueOf<T extends HTMLInputElement | HTMLSelectElement>(selector: string): string {

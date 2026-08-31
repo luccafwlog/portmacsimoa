@@ -72,6 +72,10 @@ button { cursor: pointer; }
 .field select { background-image: linear-gradient(45deg, transparent 50%, var(--navy-2) 50%), linear-gradient(135deg, var(--navy-2) 50%, transparent 50%); background-position: calc(100% - 17px) 20px, calc(100% - 12px) 20px; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
 .field input:focus, .field select:focus { border-color: var(--navy-2); background: #fff; box-shadow: 0 0 0 3px rgba(10, 65, 107, .11); }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.period-preview { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 15px; background: #e8f0ef; border-left: 3px solid var(--green); }
+.preview-label { display: block; color: var(--navy-2); font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: .06em; }
+.period-preview small { display: block; margin-top: 5px; color: var(--muted); font-size: 9px; }
+.period-preview strong { color: var(--navy); font-size: 28px; letter-spacing: -.06em; }
 .form-note { display: flex; gap: 10px; align-items: flex-start; margin-top: 2px; padding: 12px; background: var(--yellow-soft); border-left: 3px solid var(--yellow); }
 .note-mark { display: grid; flex: 0 0 16px; place-items: center; width: 16px; height: 16px; color: #9c6a00; border: 1px solid #e2a900; border-radius: 50%; font-family: Georgia, serif; font-size: 11px; }
 .form-note p { margin: 0; color: #795b1b; font-size: 10px; line-height: 1.55; }
