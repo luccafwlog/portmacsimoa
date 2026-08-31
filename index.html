@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#062f52" />
+    <title>PORTMAC · Simulador de custo</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="PORTMAC início">
+          <img src="/brand/portmac-blue.png" alt="PORTMAC" />
+        </a>
+        <div class="topbar-meta">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span>ambiente interno</span>
+        </div>
+      </header>
+
+      <main class="page">
+        <section class="hero">
+          <div class="eyebrow">COTAÇÃO PRELIMINAR <span>·</span> PORTO DE VITÓRIA</div>
+          <h1>Quanto custa <em>esta</em> operação?</h1>
+          <p>Monte um cenário, veja quantos períodos ele ocupa e ajuste os ternos quando a operação pedir outra distribuição.</p>
+        </section>
+
+        <div class="workspace-grid">
+          <section class="panel input-panel" aria-labelledby="dados-title">
+            <div class="panel-heading">
+              <div>
+                <span class="section-index">01</span>
+                <h2 id="dados-title">Dados da operação</h2>
+              </div>
+              <span class="required-note">todos os campos são obrigatórios</span>
+            </div>
+
+            <form id="simulation-form">
+              <label class="field field-wide">
+                <span>Faina</span>
+                <select id="faina" required>
+                  <option value="GRANITO">Granito</option>
+                </select>
+                <small>catálogo de demonstração</small>
+              </label>
+
+              <div class="field-row">
+                <label class="field">
+                  <span>Data de início</span>
+                  <input id="data" type="date" value="2026-09-04" required />
+                </label>
+                <label class="field">
+                  <span>Período de início</span>
+                  <select id="periodo" required>
+                    <option value="P1">P1 · início do turno</option>
+                    <option value="P2">P2 · segundo período</option>
+                    <option value="P3">P3 · terceiro período</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="field-row">
+                <label class="field">
+                  <span>Volume total <b>ton</b></span>
+                  <input id="volume" type="number" min="0.01" step="0.01" value="105" required />
+                </label>
+                <label class="field">
+                  <span>Produtividade <b>ton / período</b></span>
+                  <input id="produtividade" type="number" min="0.01" step="0.01" value="10" required />
+                </label>
+              </div>
+
+              <label class="field field-wide">
+                <span>Total de ternos</span>
+                <input id="total-ternos" type="number" min="1" step="1" value="10" required />
+                <small>distribuição equilibrada automática; você pode ajustar depois</small>
+              </label>
+
+              <div class="form-note">
+                <span class="note-mark">i</span>
+                <p>A produtividade é a produção total esperada da operação por período. O simulador não a multiplica pelos ternos.</p>
+              </div>
+
+              <button class="primary-button" type="submit">
+                <span>Calcular cenário</span>
+                <span class="button-arrow" aria-hidden="true">↗</span>
+              </button>
+            </form>
+          </section>
+
+          <section class="results-column" aria-live="polite">
+            <div id="demo-banner" class="demo-banner">
+              <span class="demo-icon">⌁</span>
+              <span><strong>Modo demonstração</strong> · valores do OGMO ainda não foram conectados.</span>
+            </div>
+            <div id="error" class="error-message" role="alert" hidden></div>
+
+            <section id="empty-state" class="panel empty-state">
+              <div class="empty-mark">↘</div>
+              <h2>Seu cenário aparece aqui</h2>
+              <p>Preencha os dados ao lado para enxergar o custo por período e o total da operação.</p>
+            </section>
+
+            <section id="result-state" class="result-state" hidden>
+              <div class="result-intro">
+                <div>
+                  <span class="eyebrow">RESULTADO DO CENÁRIO</span>
+                  <h2 id="result-faina">Granito</h2>
+                </div>
+                <span class="result-chip">cenário manual</span>
+              </div>
+
+              <div class="metrics-grid">
+                <div class="metric metric-primary">
+                  <span>Custo por tonelada</span>
+                  <strong id="cost-per-ton">R$ 0,00</strong>
+                  <small>número de referência</small>
+                </div>
+                <div class="metric">
+                  <span>Custo total</span>
+                  <strong id="cost-total">R$ 0,00</strong>
+                  <small>operação completa</small>
+                </div>
+                <div class="metric">
+                  <span>Períodos</span>
+                  <strong id="period-count">0</strong>
+                  <small>requisitados</small>
+                </div>
+              </div>
+
+              <section class="panel periods-panel">
+                <div class="panel-heading periods-heading">
+                  <div>
+                    <span class="section-index">02</span>
+                    <h2>Distribuição da operação</h2>
+                  </div>
+                  <span class="sum-badge">total: <strong id="ternos-total-label">0</strong> ternos</span>
+                </div>
+                <p class="panel-caption">Ajuste os ternos por período para testar outro cenário. A soma precisa permanecer igual.</p>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>Período</th><th>Produção</th><th>Ternos</th><th>Custo</th></tr>
+                    </thead>
+                    <tbody id="periods-body"></tbody>
+                  </table>
+                </div>
+                <div id="distribution-status" class="distribution-status" hidden></div>
+              </section>
+
+              <section class="calculation-strip">
+                <div>
+                  <span class="strip-label">MEMÓRIA DO CÁLCULO</span>
+                  <p id="calculation-summary">105 ton ÷ 10 ton/período = 11 períodos</p>
+                </div>
+                <span class="strip-arrow">→</span>
+              </section>
+            </section>
+          </section>
+        </div>
+
+        <footer class="footer-note">
+          <span>PORTMAC · simulador de custo de operação</span>
+          <span><i></i> catálogo oficial pendente</span>
+        </footer>
+      </main>
+    </div>
+    <script type="module" src="/src/app.ts"></script>
+  </body>
+</html>
