@@ -33,6 +33,7 @@ const optionalCostLabels: Record<TipoDeCustoOpcional, string> = {
   MADEIRA: 'Madeira',
   LOCACAO_DE_MAQUINA: 'Locação de máquina',
   MATERIAL_DE_ICAMENTO: 'Material de içamento',
+  OUTRO: 'Outro custo',
 };
 
 form.addEventListener('submit', (event) => {
@@ -136,30 +137,52 @@ function applyDistribution(): void {
 function readOptionalCosts(): CustoOpcional[] {
   return Array.from(costToggles)
     .filter((toggle) => toggle.checked)
-    .map((toggle) => ({
-      tipo: toggle.dataset.costType as TipoDeCustoOpcional,
-      custoTotal: numberOf(`#${toggle.dataset.costInput!}`),
-    }));
+    .map((toggle) => {
+      const tipo = toggle.dataset.costType as TipoDeCustoOpcional;
+      return {
+        tipo,
+        custoTotal: numberOf(`#${toggle.dataset.costInput!}`),
+        ...(tipo === 'OUTRO'
+          ? { descricao: valueOf<HTMLInputElement>(`#${toggle.dataset.costDescription!}`).trim() }
+          : {}),
+      };
+    });
 }
 
 function updateOptionalCostInput(toggle: HTMLInputElement): void {
-  const input = document.querySelector<HTMLInputElement>(`#${toggle.dataset.costInput!}`)!;
-  const wrapper = input.closest<HTMLElement>('.optional-input')!;
-  input.disabled = !toggle.checked;
-  input.required = toggle.checked;
-  wrapper.hidden = !toggle.checked;
+  const item = toggle.closest<HTMLElement>('.optional-cost-item')!;
+  item.querySelectorAll<HTMLInputElement>('input:not(.cost-toggle)').forEach((input) => {
+    input.disabled = !toggle.checked;
+    input.required = toggle.checked;
+  });
+  item.querySelectorAll<HTMLElement>('.optional-input, .custom-cost-inputs').forEach((wrapper) => {
+    wrapper.hidden = !toggle.checked;
+  });
 }
 
 function renderOptionalCostLines(resultado: ResultadoDeSimulacao): void {
   const lines = document.querySelector<HTMLDivElement>('#optional-cost-lines')!;
   lines.innerHTML = resultado.custosOpcionais.length
-    ? resultado.custosOpcionais.map((custo) => `
+    ? resultado.custosOpcionais.map((custo) => {
+      const label = custo.tipo === 'OUTRO' ? custo.descricao?.trim() || optionalCostLabels.OUTRO : optionalCostLabels[custo.tipo];
+      return `
         <div class="cost-line cost-line-optional">
-          <div><span>${optionalCostLabels[custo.tipo]}</span><small>${money(custo.custoPorTonelada)} / ton</small></div>
+          <div><span>${escapeHtml(label)}</span><small>${money(custo.custoPorTonelada)} / ton</small></div>
           <strong>${money(custo.custoTotal)}</strong>
         </div>
-      `).join('')
+      `;
+    }).join('')
     : '<p class="no-optional-costs">Nenhum custo opcional ativado.</p>';
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]!);
 }
 
 function showDistributionError(message: string): void {

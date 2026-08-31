@@ -117,6 +117,9 @@ function validarEntrada(entrada: EntradaDeSimulacao): void {
   if ((entrada.custosOpcionais ?? []).some((custo) => !Number.isFinite(custo.custoTotal) || custo.custoTotal < 0)) {
     throw new EntradaInvalida('Cada custo opcional deve ser um valor maior ou igual a zero.');
   }
+  if ((entrada.custosOpcionais ?? []).some((custo) => custo.tipo === 'OUTRO' && !custo.descricao?.trim())) {
+    throw new EntradaInvalida('Descreva o custo opcional personalizado.');
+  }
 }
 
 function distribuirTernos(total: number, periodos: number): readonly number[] {

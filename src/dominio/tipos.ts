@@ -6,10 +6,13 @@ export type TipoDeCustoOpcional =
   | 'MATERIAL_DE_PEACAO'
   | 'MADEIRA'
   | 'LOCACAO_DE_MAQUINA'
-  | 'MATERIAL_DE_ICAMENTO';
+  | 'MATERIAL_DE_ICAMENTO'
+  | 'OUTRO';
 
 export interface CustoOpcional {
   readonly tipo: TipoDeCustoOpcional;
+  /** Obrigatória quando o tipo for OUTRO. */
+  readonly descricao?: string;
   readonly custoTotal: number;
 }
 
