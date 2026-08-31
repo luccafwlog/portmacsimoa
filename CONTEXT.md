@@ -13,6 +13,9 @@ o custo final nem uma previsão automática da operação.
 - **Cliente** — nome opcional usado para identificar a cotação. Não altera o
   cálculo do cenário.
 - **Faina** — a operação que será cotada. Uma simulação trata uma única faina.
+  A faina é selecionada do catálogo; o usuário não cria uma faina livremente.
+  A ACT é sempre consultada primeiro. A CCT só é usada quando a faina não
+  estiver prevista na ACT.
 - **Período** — uma das quatro faixas diárias da operação: `01-07`, `07-13`,
   `13-19` ou `19-01`. Cada período é apresentado junto da sua data de início;
   o período `19-01` termina no dia seguinte. Valores e regras de custo ainda
@@ -24,8 +27,8 @@ o custo final nem uma previsão automática da operação.
   períodos da operação. O usuário informa o total; o sistema cria uma
   distribuição equilibrada e permite uma redistribuição manual posterior.
 - **Catálogo do OGMO** — fonte externa dos valores e regras necessários para
-  calcular o custo de um período. Se faltar dado essencial, a cotação real deve
-  ser recusada.
+  calcular o custo de um período. Cada faina cadastrada mantém sua fonte,
+  vigência e referência documental. Não existe preço criado pelo usuário.
 
 ## Fluxo decidido
 
@@ -39,8 +42,9 @@ o custo final nem uma previsão automática da operação.
 5. Os ternos são distribuídos como inteiros e equilibrados. Uma distribuição
    explícita só é aceita se tiver a mesma quantidade de períodos e a mesma soma
    do total informado.
-6. O calendário do OGMO projeta os períodos e o catálogo do OGMO calcula cada
-   custo.
+6. O calendário do OGMO projeta os períodos e o catálogo documental calcula
+   cada custo. A resolução da faina segue ACT e, somente quando necessário,
+   CCT.
 7. O resultado mostra custo total, custo por tonelada e memória simples por
    período. O custo final soma a mão de obra aos custos opcionais informados.
 
@@ -50,9 +54,11 @@ o custo final nem uma previsão automática da operação.
 - sem múltiplas cargas ou navios mistos;
 - sem otimização automática;
 - sem relação automática entre quantidade de ternos e produtividade;
-- sem regras de jornada, adicionais, pisos ou valores codificados antes da
-  conferência do catálogo do OGMO;
+- sem regras de jornada, adicionais, pisos ou valores fora da primeira fatia
+  conferida do catálogo do OGMO;
 - sem banco, autenticação ou histórico.
 
-O catálogo fictício usado nos testes serve somente para validar a arquitetura.
-Ele não representa uma cotação oficial.
+O catálogo da aplicação contém uma primeira fatia da ACT para granito, produto
+siderúrgico e tubos/trilhos. As demais fainas e o fallback CCT serão adicionados
+somente após conferência de suas taxas, unidades e equipes; os catálogos falsos
+dos testes servem apenas para validar o motor.

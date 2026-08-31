@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { calendarioDemo } from '../src/calendario/demo.js';
+import { calendarioOperacional } from '../src/calendario/operacional.js';
 import { data } from '../src/dominio/tempo.js';
 
-describe('calendário demonstrativo', () => {
+describe('calendário operacional', () => {
   it('avança a data depois do período 19-01', () => {
-    const periodos = calendarioDemo.projetar(
+    const periodos = calendarioOperacional.projetar(
       { data: data(2026, 9, 4), periodo: '19-01' },
       3,
     );
@@ -17,7 +17,7 @@ describe('calendário demonstrativo', () => {
   });
 
   it('mantém quatro faixas no mesmo dia antes de avançar', () => {
-    const periodos = calendarioDemo.projetar(
+    const periodos = calendarioOperacional.projetar(
       { data: data(2026, 9, 4), periodo: '01-07' },
       5,
     );

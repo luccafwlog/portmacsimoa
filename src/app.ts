@@ -1,28 +1,16 @@
 import './styles.css';
 import { data, formatarDataPtBr } from './dominio/tempo.js';
-import { calendarioDemo } from './calendario/demo.js';
-import type { CatalogoOgmo } from './catalogo/portas.js';
+import { calendarioOperacional } from './calendario/operacional.js';
+import { catalogoPortmac } from './catalogo/portmac.js';
 import type { CustoOpcional, EntradaDeSimulacao, ResultadoDeSimulacao, TipoDeCustoOpcional } from './dominio/tipos.js';
 import { simular } from './motor/simulador.js';
-
-const demoCatalogo: CatalogoOgmo = {
-  obterFaina(codigo) {
-    return codigo === 'GRANITO' ? { codigo, descricao: 'Granito', unidade: 'TON' } : undefined;
-  },
-  calcularCustoDoPeriodo({ producaoToneladas, ternos, periodo }) {
-    const custo = producaoToneladas * 10 + ternos * 100 * periodo.multiplicador;
-    return {
-      total: custo,
-      memoria: [{ descricao: 'Custo fictício do catálogo de demonstração', valor: custo }],
-    };
-  },
-};
 
 const form = document.querySelector<HTMLFormElement>('#simulation-form')!;
 const errorBox = document.querySelector<HTMLDivElement>('#error')!;
 const emptyState = document.querySelector<HTMLElement>('#empty-state')!;
 const resultState = document.querySelector<HTMLElement>('#result-state')!;
 const distributionStatus = document.querySelector<HTMLDivElement>('#distribution-status')!;
+const fainaInput = document.querySelector<HTMLSelectElement>('#faina')!;
 const volumeInput = document.querySelector<HTMLInputElement>('#volume')!;
 const productivityInput = document.querySelector<HTMLInputElement>('#produtividade')!;
 const costToggles = document.querySelectorAll<HTMLInputElement>('.cost-toggle');
@@ -39,6 +27,10 @@ const optionalCostLabels: Record<TipoDeCustoOpcional, string> = {
   OUTRO: 'Outro custo',
 };
 
+fainaInput.innerHTML = catalogoPortmac.listarFainas()
+  .map((faina) => `<option value="${faina.codigo}">${faina.descricao} · ${faina.fonte}</option>`)
+  .join('');
+
 form.addEventListener('submit', (event) => {
   event.preventDefault();
   recalculate();
@@ -53,7 +45,7 @@ function recalculate(distribution?: readonly number[]): void {
   clearError();
   try {
     const entrada = readInput(distribution);
-    currentResult = simular(entrada, demoCatalogo, calendarioDemo);
+    currentResult = simular(entrada, catalogoPortmac, calendarioOperacional);
     render(currentResult);
   } catch (error) {
     showError(error instanceof Error ? error.message : 'Não foi possível calcular este cenário.');
@@ -80,7 +72,9 @@ function readInput(distribution?: readonly number[]): EntradaDeSimulacao {
 function render(resultado: ResultadoDeSimulacao): void {
   emptyState.hidden = true;
   resultState.hidden = false;
-  setText('#result-faina', resultado.entrada.faina === 'GRANITO' ? 'Granito' : resultado.entrada.faina);
+  const faina = catalogoPortmac.obterFaina(resultado.entrada.faina);
+  setText('#result-faina', faina?.descricao ?? resultado.entrada.faina);
+  setText('#result-source', faina ? `${faina.fonte} · ${faina.vigencia}` : 'fonte não encontrada');
   setText('#result-client', resultado.entrada.cliente ? `Cliente: ${resultado.entrada.cliente}` : 'Cliente não informado');
   setText('#labor-cost-total', money(resultado.custoDeMaoDeObra));
   setText('#labor-cost-per-ton', `${money(resultado.custoDeMaoDeObra / resultado.entrada.volumeToneladas)} / ton`);

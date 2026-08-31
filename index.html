@@ -37,11 +37,9 @@
 
             <form id="simulation-form">
               <label class="field field-wide">
-                <span>Faina</span>
-                <select id="faina" required>
-                  <option value="GRANITO">Granito</option>
-                </select>
-                <small>catálogo de demonstração</small>
+                <span>Faina / tipo de carga</span>
+                <select id="faina" required></select>
+                <small>selecionada no catálogo documental vigente</small>
               </label>
 
               <label class="field field-wide">
@@ -163,9 +161,9 @@
           </section>
 
           <section class="results-column" aria-live="polite">
-            <div id="demo-banner" class="demo-banner">
-              <span class="demo-icon">⌁</span>
-              <span><strong>Modo demonstração</strong> · valores do OGMO ainda não foram conectados.</span>
+            <div id="catalog-status-banner" class="catalog-banner">
+              <span class="catalog-icon">⌁</span>
+              <span><strong>Catálogo ACT inicial</strong> · fainas cadastradas com taxas documentais; CCT será ampliada para os casos não previstos na ACT.</span>
             </div>
             <div id="error" class="error-message" role="alert" hidden></div>
 
@@ -182,7 +180,7 @@
                   <h2 id="result-faina">Granito</h2>
                   <p id="result-client" class="result-client">Cliente não informado</p>
                 </div>
-                <span class="result-chip">cenário manual</span>
+                <span id="result-source" class="result-chip">ACT · 2026/2028</span>
               </div>
 
               <div class="metrics-grid">
@@ -262,7 +260,7 @@
 
         <footer class="footer-note">
           <span>PORTMAC · simulador de custo de operação</span>
-          <span><i></i> catálogo oficial pendente</span>
+          <span><i></i> catálogo ACT inicial · CCT em ampliação</span>
         </footer>
       </main>
     </div>

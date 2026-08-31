@@ -113,9 +113,9 @@ button { cursor: pointer; }
 .button-arrow { display: grid; place-items: center; width: 27px; height: 27px; color: var(--navy); background: var(--yellow); border-radius: 50%; font-size: 16px; }
 
 .results-column { display: grid; gap: 16px; min-width: 0; animation: lift-in .7s .18s ease both; }
-.demo-banner { display: flex; align-items: center; gap: 10px; min-height: 43px; padding: 10px 15px; color: #795b1b; background: var(--yellow-soft); border: 1px solid #f4d88e; font-size: 10px; }
-.demo-banner strong { font-weight: 800; }
-.demo-icon { color: var(--yellow); font-size: 20px; line-height: 1; }
+.catalog-banner { display: flex; align-items: center; gap: 10px; min-height: 43px; padding: 10px 15px; color: #795b1b; background: var(--yellow-soft); border: 1px solid #f4d88e; font-size: 10px; }
+.catalog-banner strong { font-weight: 800; }
+.catalog-icon { color: var(--yellow); font-size: 20px; line-height: 1; }
 .error-message { padding: 11px 14px; color: #8e302b; background: #fff0ee; border: 1px solid #f3c7c3; font-size: 11px; }
 .empty-state { min-height: 355px; display: grid; place-content: center; justify-items: center; padding: 40px; text-align: center; border-style: dashed; box-shadow: none; }
 .empty-mark { display: grid; place-items: center; width: 52px; height: 52px; margin-bottom: 21px; color: var(--navy); background: var(--yellow); border-radius: 50% 50% 50% 5px; font-family: Georgia, serif; font-size: 25px; transform: rotate(-12deg); }

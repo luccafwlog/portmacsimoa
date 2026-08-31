@@ -2,6 +2,8 @@ import type { DataLocal } from './tempo.js';
 
 export type UnidadeDeMedida = 'TON';
 
+export type FonteDoCatalogo = 'ACT' | 'CCT';
+
 export type TipoDeCustoOpcional =
   | 'MATERIAL_DE_PEACAO'
   | 'MADEIRA'
@@ -39,14 +41,17 @@ export interface EntradaDeSimulacao {
 export interface FainaCatalogada {
   readonly codigo: string;
   readonly descricao: string;
+  readonly tipoDeCarga: string;
   readonly unidade: UnidadeDeMedida;
+  readonly fonte: FonteDoCatalogo;
+  readonly vigencia: string;
+  readonly referencia: string;
 }
 
 export interface PeriodoOgmo {
   readonly indice: number;
   readonly data: DataLocal;
   readonly identificador: string;
-  readonly multiplicador: number;
 }
 
 export interface ContextoDeCustoDoPeriodo {
