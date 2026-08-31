@@ -7,9 +7,9 @@ o custo final nem uma previsão automática da operação.
 ## Vocabulário decidido
 
 - **Custos opcionais** — material de peação, madeira, locação de máquina,
-  material de içamento ou outro item descrito pelo usuário. Quando ativados, o
-  usuário informa o custo total de cada item; o SCO divide cada valor pelo
-  volume do navio.
+  material de içamento ou outros itens descritos pelo usuário. Cada item pode
+  ser ativado separadamente; o usuário informa seu custo total e o SCO divide
+  cada valor pelo volume do navio.
 - **Cliente** — nome opcional usado para identificar a cotação. Não altera o
   cálculo do cenário.
 - **Faina** — a operação que será cotada. Uma simulação trata uma única faina.

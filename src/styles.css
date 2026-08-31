@@ -100,6 +100,13 @@ button { cursor: pointer; }
 .optional-input input:focus { border-color: var(--navy-2); box-shadow: 0 0 0 3px rgba(10, 65, 107, .11); }
 .custom-cost-inputs { display: grid; gap: 10px; padding-left: 40px; }
 .custom-cost-inputs .optional-input { padding-left: 0; }
+.custom-cost-list { display: grid; gap: 10px; margin-top: 10px; }
+.custom-cost-item { border: 1px solid var(--line); }
+.custom-cost-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.remove-custom-cost { padding: 0; color: var(--muted); background: transparent; border: 0; font-family: 'DM Mono', monospace; font-size: 9px; cursor: pointer; text-transform: uppercase; }
+.remove-custom-cost:hover { color: #8e302b; }
+.secondary-button { width: 100%; min-height: 36px; margin-top: 10px; color: var(--navy-2); background: transparent; border: 1px dashed #b6c8cb; border-radius: 2px; font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; transition: border-color .2s, color .2s, background .2s; }
+.secondary-button:hover { color: var(--navy); background: #f7faf9; border-color: var(--navy-2); }
 .primary-button { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 52px; margin-top: 4px; padding: 0 15px 0 18px; color: #fff; background: var(--navy); border: 0; border-radius: 2px; font-size: 12px; font-weight: 800; letter-spacing: .01em; transition: background .2s, transform .2s; }
 .primary-button:hover { background: var(--navy-2); transform: translateY(-2px); }
 .button-arrow { display: grid; place-items: center; width: 27px; height: 27px; color: var(--navy); background: var(--yellow); border-radius: 50%; font-size: 16px; }

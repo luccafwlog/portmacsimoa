@@ -26,7 +26,10 @@ const distributionStatus = document.querySelector<HTMLDivElement>('#distribution
 const volumeInput = document.querySelector<HTMLInputElement>('#volume')!;
 const productivityInput = document.querySelector<HTMLInputElement>('#produtividade')!;
 const costToggles = document.querySelectorAll<HTMLInputElement>('.cost-toggle');
+const customCostList = document.querySelector<HTMLDivElement>('#custom-cost-list')!;
+const addCustomCostButton = document.querySelector<HTMLButtonElement>('#add-custom-cost')!;
 let currentResult: ResultadoDeSimulacao | undefined;
+let customCostCounter = 0;
 
 const optionalCostLabels: Record<TipoDeCustoOpcional, string> = {
   MATERIAL_DE_PEACAO: 'Material de peação',
@@ -43,6 +46,7 @@ form.addEventListener('submit', (event) => {
 volumeInput.addEventListener('input', updateCalculatedPeriods);
 productivityInput.addEventListener('input', updateCalculatedPeriods);
 costToggles.forEach((toggle) => toggle.addEventListener('change', () => updateOptionalCostInput(toggle)));
+addCustomCostButton.addEventListener('click', addCustomCost);
 updateCalculatedPeriods();
 
 function recalculate(distribution?: readonly number[]): void {
@@ -135,7 +139,7 @@ function applyDistribution(): void {
 }
 
 function readOptionalCosts(): CustoOpcional[] {
-  return Array.from(costToggles)
+  return Array.from(document.querySelectorAll<HTMLInputElement>('.cost-toggle'))
     .filter((toggle) => toggle.checked)
     .map((toggle) => {
       const tipo = toggle.dataset.costType as TipoDeCustoOpcional;
@@ -147,6 +151,43 @@ function readOptionalCosts(): CustoOpcional[] {
           : {}),
       };
     });
+}
+
+function addCustomCost(): void {
+  customCostCounter += 1;
+  const suffix = customCostCounter;
+  const descriptionId = `custom-cost-description-${suffix}`;
+  const amountId = `custom-cost-amount-${suffix}`;
+  const fieldsId = `custom-cost-fields-${suffix}`;
+
+  customCostList.insertAdjacentHTML('beforeend', `
+    <div class="optional-cost-item custom-cost-item">
+      <div class="custom-cost-heading">
+        <label class="toggle-row">
+          <input class="cost-toggle" type="checkbox" checked data-cost-type="OUTRO" data-cost-input="${amountId}" data-cost-description="${descriptionId}" />
+          <span class="toggle-switch" aria-hidden="true"></span>
+          <span>Outro custo ${suffix}</span>
+        </label>
+        <button class="remove-custom-cost" type="button">Remover</button>
+      </div>
+      <div id="${fieldsId}" class="custom-cost-inputs">
+        <label class="optional-input" for="${descriptionId}">
+          <span>Descrição</span>
+          <input id="${descriptionId}" type="text" maxlength="120" placeholder="Nome do custo" required />
+        </label>
+        <label class="optional-input" for="${amountId}">
+          <span>Custo total <b>R$</b></span>
+          <input id="${amountId}" type="number" min="0" step="0.01" placeholder="0,00" required />
+        </label>
+      </div>
+    </div>
+  `);
+
+  const item = customCostList.lastElementChild as HTMLElement;
+  const toggle = item.querySelector<HTMLInputElement>('.cost-toggle')!;
+  toggle.addEventListener('change', () => updateOptionalCostInput(toggle));
+  item.querySelector<HTMLButtonElement>('.remove-custom-cost')!.addEventListener('click', () => item.remove());
+  updateOptionalCostInput(toggle);
 }
 
 function updateOptionalCostInput(toggle: HTMLInputElement): void {

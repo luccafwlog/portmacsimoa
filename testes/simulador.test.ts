@@ -115,21 +115,26 @@ describe('simulador mínimo', () => {
     expect(resultado.custoPorTonelada).toBe(85);
   });
 
-  it('aceita um custo opcional personalizado com descrição', () => {
+  it('aceita vários custos opcionais personalizados com descrição', () => {
     const resultado = simular(
       {
         ...entrada,
         volumeToneladas: 20,
         produtividadeToneladasPorPeriodo: 10,
         totalDeTernos: 3,
-        custosOpcionais: [{ tipo: 'OUTRO', descricao: 'Taxa de acesso', custoTotal: 200 }],
+        custosOpcionais: [
+          { tipo: 'OUTRO', descricao: 'Taxa de acesso', custoTotal: 200 },
+          { tipo: 'OUTRO', descricao: 'Serviço adicional', custoTotal: 300 },
+        ],
       },
       catalogo,
       calendario,
     );
 
     expect(resultado.custosOpcionais[0]?.descricao).toBe('Taxa de acesso');
-    expect(resultado.custoTotal).toBe(900);
-    expect(resultado.custoPorTonelada).toBe(45);
+    expect(resultado.custosOpcionais[1]?.descricao).toBe('Serviço adicional');
+    expect(resultado.custoOpcionalTotal).toBe(500);
+    expect(resultado.custoTotal).toBe(1200);
+    expect(resultado.custoPorTonelada).toBe(60);
   });
 });

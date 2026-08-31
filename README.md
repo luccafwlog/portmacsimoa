@@ -6,8 +6,9 @@ O usuário informa uma faina, o início da operação, o volume, a produtividade
 total por período e o total de ternos da operação. O núcleo calcula a quantidade
 de períodos, distribui os ternos inteiros entre eles e devolve o custo total, o
 custo por tonelada e uma memória simples do cálculo.
-Custos opcionais de operação podem ser informados separadamente; cada um é
-dividido pelo volume do navio e somado ao custo final.
+Custos opcionais de operação podem ser informados separadamente; cada item é
+dividido pelo volume do navio e somado ao custo final. Também é possível
+adicionar quantos custos personalizados forem necessários.
 
 O projeto não estima entradas, não escolhe a melhor operação e não administra a
 operação. A redistribuição de ternos é um cenário manual: a soma dos ternos
