@@ -94,4 +94,24 @@ describe('simulador mínimo', () => {
     expect(resultado.periodos.map((p) => p.producaoToneladas)).toEqual([10, 10]);
     expect(resultado.periodos.map((p) => p.ternos)).toEqual([1, 2]);
   });
+
+  it('soma custos opcionais ao total e calcula seu valor por tonelada', () => {
+    const resultado = simular(
+      {
+        ...entrada,
+        volumeToneladas: 20,
+        produtividadeToneladasPorPeriodo: 10,
+        totalDeTernos: 3,
+        custosOpcionais: [{ tipo: 'MADEIRA', custoTotal: 1000 }],
+      },
+      catalogo,
+      calendario,
+    );
+
+    expect(resultado.custoDeMaoDeObra).toBe(700);
+    expect(resultado.custosOpcionais[0]?.custoPorTonelada).toBe(50);
+    expect(resultado.custoOpcionalTotal).toBe(1000);
+    expect(resultado.custoTotal).toBe(1700);
+    expect(resultado.custoPorTonelada).toBe(85);
+  });
 });

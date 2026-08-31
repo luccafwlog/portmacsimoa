@@ -6,6 +6,9 @@ o custo final nem uma previsão automática da operação.
 
 ## Vocabulário decidido
 
+- **Custos opcionais** — material de peação, madeira, locação de máquina e
+  material de içamento. Quando ativados, o usuário informa o custo total de
+  cada item; o SCO divide cada valor pelo volume do navio.
 - **Cliente** — nome opcional usado para identificar a cotação. Não altera o
   cálculo do cenário.
 - **Faina** — a operação que será cotada. Uma simulação trata uma única faina.
@@ -38,7 +41,7 @@ o custo final nem uma previsão automática da operação.
 6. O calendário do OGMO projeta os períodos e o catálogo do OGMO calcula cada
    custo.
 7. O resultado mostra custo total, custo por tonelada e memória simples por
-   período.
+   período. O custo final soma a mão de obra aos custos opcionais informados.
 
 ## Limites do primeiro núcleo
 

@@ -79,6 +79,25 @@ button { cursor: pointer; }
 .form-note { display: flex; gap: 10px; align-items: flex-start; margin-top: 2px; padding: 12px; background: var(--yellow-soft); border-left: 3px solid var(--yellow); }
 .note-mark { display: grid; flex: 0 0 16px; place-items: center; width: 16px; height: 16px; color: #9c6a00; border: 1px solid #e2a900; border-radius: 50%; font-family: Georgia, serif; font-size: 11px; }
 .form-note p { margin: 0; color: #795b1b; font-size: 10px; line-height: 1.55; }
+.optional-costs { padding-top: 4px; border-top: 1px solid var(--line); }
+.optional-costs-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0 12px; }
+.optional-costs-heading > div { display: flex; align-items: center; gap: 11px; }
+.optional-costs-heading h2 { margin: 0; color: var(--navy); font-size: 15px; letter-spacing: -.02em; }
+.optional-note { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 8px; text-transform: uppercase; }
+.optional-caption { margin: 0 0 13px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.optional-cost-list { display: grid; gap: 1px; border: 1px solid var(--line); background: var(--line); }
+.optional-cost-item { display: grid; gap: 12px; padding: 12px; background: #f7faf9; }
+.toggle-row { display: flex; align-items: center; gap: 9px; color: var(--ink); font-size: 11px; font-weight: 700; cursor: pointer; }
+.toggle-row input { position: absolute; opacity: 0; pointer-events: none; }
+.toggle-switch { position: relative; flex: 0 0 31px; width: 31px; height: 18px; background: #c9d4d7; border-radius: 20px; transition: background .2s; }
+.toggle-switch::after { position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(6,47,82,.2); content: ''; transition: transform .2s; }
+.toggle-row input:checked + .toggle-switch { background: var(--green); }
+.toggle-row input:checked + .toggle-switch::after { transform: translateX(13px); }
+.toggle-row input:focus-visible + .toggle-switch { outline: 3px solid rgba(10, 65, 107, .18); outline-offset: 2px; }
+.optional-input { display: grid; grid-template-columns: 1fr 108px; align-items: center; gap: 10px; padding-left: 40px; }
+.optional-input > span { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 9px; text-transform: uppercase; }
+.optional-input input { width: 100%; height: 34px; padding: 0 9px; color: var(--navy); background: #fff; border: 1px solid var(--line); border-radius: 2px; outline: none; font-size: 12px; font-weight: 600; }
+.optional-input input:focus { border-color: var(--navy-2); box-shadow: 0 0 0 3px rgba(10, 65, 107, .11); }
 .primary-button { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 52px; margin-top: 4px; padding: 0 15px 0 18px; color: #fff; background: var(--navy); border: 0; border-radius: 2px; font-size: 12px; font-weight: 800; letter-spacing: .01em; transition: background .2s, transform .2s; }
 .primary-button:hover { background: var(--navy-2); transform: translateY(-2px); }
 .button-arrow { display: grid; place-items: center; width: 27px; height: 27px; color: var(--navy); background: var(--yellow); border-radius: 50%; font-size: 16px; }
@@ -104,6 +123,18 @@ button { cursor: pointer; }
 .metric span { font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: .04em; text-transform: uppercase; opacity: .74; }
 .metric strong { font-size: clamp(20px, 3vw, 30px); letter-spacing: -.06em; }
 .metric small { font-size: 9px; opacity: .58; }
+.cost-breakdown { overflow: hidden; }
+.cost-breakdown-heading { align-items: center; padding: 20px 24px 17px; }
+.cost-lines { padding: 0 24px; }
+.cost-line { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 0; border-top: 1px solid var(--line); }
+.cost-line div { display: grid; gap: 5px; }
+.cost-line span { color: var(--ink); font-size: 11px; font-weight: 700; }
+.cost-line small { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 9px; }
+.cost-line strong { color: var(--navy); font-size: 15px; }
+.cost-line-total { margin-top: 3px; padding: 17px 0 20px; border-top: 2px solid var(--navy); }
+.cost-line-total span { color: var(--navy); }
+.cost-line-total strong { font-size: 20px; }
+.no-optional-costs { margin: 0; padding: 13px 0; color: var(--muted); font-size: 10px; font-style: italic; }
 .periods-panel { overflow: hidden; }
 .periods-heading { align-items: center; padding: 22px 24px 18px; }
 .sum-badge { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 10px; }

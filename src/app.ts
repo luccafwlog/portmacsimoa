@@ -2,7 +2,7 @@ import './styles.css';
 import { data, formatarDataPtBr } from './dominio/tempo.js';
 import { calendarioDemo } from './calendario/demo.js';
 import type { CatalogoOgmo } from './catalogo/portas.js';
-import type { EntradaDeSimulacao, ResultadoDeSimulacao } from './dominio/tipos.js';
+import type { CustoOpcional, EntradaDeSimulacao, ResultadoDeSimulacao, TipoDeCustoOpcional } from './dominio/tipos.js';
 import { simular } from './motor/simulador.js';
 
 const demoCatalogo: CatalogoOgmo = {
@@ -25,7 +25,15 @@ const resultState = document.querySelector<HTMLElement>('#result-state')!;
 const distributionStatus = document.querySelector<HTMLDivElement>('#distribution-status')!;
 const volumeInput = document.querySelector<HTMLInputElement>('#volume')!;
 const productivityInput = document.querySelector<HTMLInputElement>('#produtividade')!;
+const costToggles = document.querySelectorAll<HTMLInputElement>('.cost-toggle');
 let currentResult: ResultadoDeSimulacao | undefined;
+
+const optionalCostLabels: Record<TipoDeCustoOpcional, string> = {
+  MATERIAL_DE_PEACAO: 'Material de peação',
+  MADEIRA: 'Madeira',
+  LOCACAO_DE_MAQUINA: 'Locação de máquina',
+  MATERIAL_DE_ICAMENTO: 'Material de içamento',
+};
 
 form.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -33,6 +41,7 @@ form.addEventListener('submit', (event) => {
 });
 volumeInput.addEventListener('input', updateCalculatedPeriods);
 productivityInput.addEventListener('input', updateCalculatedPeriods);
+costToggles.forEach((toggle) => toggle.addEventListener('change', () => updateOptionalCostInput(toggle)));
 updateCalculatedPeriods();
 
 function recalculate(distribution?: readonly number[]): void {
@@ -50,8 +59,10 @@ function readInput(distribution?: readonly number[]): EntradaDeSimulacao {
   const dateValue = valueOf<HTMLInputElement>('#data');
   const [ano, mes, dia] = dateValue.split('-').map(Number);
   const cliente = valueOf<HTMLInputElement>('#cliente').trim();
+  const custosOpcionais = readOptionalCosts();
   return {
     ...(cliente ? { cliente } : {}),
+    ...(custosOpcionais.length ? { custosOpcionais } : {}),
     faina: valueOf<HTMLSelectElement>('#faina'),
     inicio: { data: data(ano!, mes!, dia!), periodo: valueOf<HTMLSelectElement>('#periodo') },
     volumeToneladas: numberOf('#volume'),
@@ -66,6 +77,10 @@ function render(resultado: ResultadoDeSimulacao): void {
   resultState.hidden = false;
   setText('#result-faina', resultado.entrada.faina === 'GRANITO' ? 'Granito' : resultado.entrada.faina);
   setText('#result-client', resultado.entrada.cliente ? `Cliente: ${resultado.entrada.cliente}` : 'Cliente não informado');
+  setText('#labor-cost-total', money(resultado.custoDeMaoDeObra));
+  setText('#labor-cost-per-ton', `${money(resultado.custoDeMaoDeObra / resultado.entrada.volumeToneladas)} / ton`);
+  setText('#composed-cost-total', money(resultado.custoTotal));
+  renderOptionalCostLines(resultado);
   setText('#cost-per-ton', money(resultado.custoPorTonelada));
   setText('#cost-total', money(resultado.custoTotal));
   setText('#period-count', String(resultado.quantidadeDePeriodos));
@@ -116,6 +131,35 @@ function applyDistribution(): void {
     return;
   }
   recalculate(values);
+}
+
+function readOptionalCosts(): CustoOpcional[] {
+  return Array.from(costToggles)
+    .filter((toggle) => toggle.checked)
+    .map((toggle) => ({
+      tipo: toggle.dataset.costType as TipoDeCustoOpcional,
+      custoTotal: numberOf(`#${toggle.dataset.costInput!}`),
+    }));
+}
+
+function updateOptionalCostInput(toggle: HTMLInputElement): void {
+  const input = document.querySelector<HTMLInputElement>(`#${toggle.dataset.costInput!}`)!;
+  const wrapper = input.closest<HTMLElement>('.optional-input')!;
+  input.disabled = !toggle.checked;
+  input.required = toggle.checked;
+  wrapper.hidden = !toggle.checked;
+}
+
+function renderOptionalCostLines(resultado: ResultadoDeSimulacao): void {
+  const lines = document.querySelector<HTMLDivElement>('#optional-cost-lines')!;
+  lines.innerHTML = resultado.custosOpcionais.length
+    ? resultado.custosOpcionais.map((custo) => `
+        <div class="cost-line cost-line-optional">
+          <div><span>${optionalCostLabels[custo.tipo]}</span><small>${money(custo.custoPorTonelada)} / ton</small></div>
+          <strong>${money(custo.custoTotal)}</strong>
+        </div>
+      `).join('')
+    : '<p class="no-optional-costs">Nenhum custo opcional ativado.</p>';
 }
 
 function showDistributionError(message: string): void {

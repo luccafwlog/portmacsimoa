@@ -68,7 +68,7 @@
 
               <div class="field-row">
                 <label class="field">
-                  <span>Volume total <b>ton</b></span>
+                  <span>Volume do navio <b>ton</b></span>
                   <input id="volume" type="number" min="0.01" step="0.01" value="105" required />
                 </label>
                 <label class="field">
@@ -90,6 +90,63 @@
                 <input id="total-ternos" type="number" min="1" step="1" value="22" required />
                 <small>distribuição equilibrada automática; você pode ajustar depois</small>
               </label>
+
+              <section class="optional-costs" aria-labelledby="optional-costs-title">
+                <div class="optional-costs-heading">
+                  <div>
+                    <span class="section-index">+</span>
+                    <h2 id="optional-costs-title">Custos opcionais</h2>
+                  </div>
+                  <span class="optional-note">não obrigatórios</span>
+                </div>
+                <p class="optional-caption">Ative um item para informar o custo total. O SCO divide esse valor pelo volume do navio.</p>
+                <div class="optional-cost-list">
+                  <div class="optional-cost-item">
+                    <label class="toggle-row">
+                      <input class="cost-toggle" type="checkbox" data-cost-type="MATERIAL_DE_PEACAO" data-cost-input="cost-material-de-pecao" />
+                      <span class="toggle-switch" aria-hidden="true"></span>
+                      <span>Material de peação</span>
+                    </label>
+                    <label class="optional-input" for="cost-material-de-pecao" hidden>
+                      <span>Custo total <b>R$</b></span>
+                      <input id="cost-material-de-pecao" type="number" min="0" step="0.01" placeholder="0,00" disabled />
+                    </label>
+                  </div>
+                  <div class="optional-cost-item">
+                    <label class="toggle-row">
+                      <input class="cost-toggle" type="checkbox" data-cost-type="MADEIRA" data-cost-input="cost-madeira" />
+                      <span class="toggle-switch" aria-hidden="true"></span>
+                      <span>Madeira</span>
+                    </label>
+                    <label class="optional-input" for="cost-madeira" hidden>
+                      <span>Custo total <b>R$</b></span>
+                      <input id="cost-madeira" type="number" min="0" step="0.01" placeholder="0,00" disabled />
+                    </label>
+                  </div>
+                  <div class="optional-cost-item">
+                    <label class="toggle-row">
+                      <input class="cost-toggle" type="checkbox" data-cost-type="LOCACAO_DE_MAQUINA" data-cost-input="cost-locacao-de-maquina" />
+                      <span class="toggle-switch" aria-hidden="true"></span>
+                      <span>Locação de máquina</span>
+                    </label>
+                    <label class="optional-input" for="cost-locacao-de-maquina" hidden>
+                      <span>Custo total <b>R$</b></span>
+                      <input id="cost-locacao-de-maquina" type="number" min="0" step="0.01" placeholder="0,00" disabled />
+                    </label>
+                  </div>
+                  <div class="optional-cost-item">
+                    <label class="toggle-row">
+                      <input class="cost-toggle" type="checkbox" data-cost-type="MATERIAL_DE_ICAMENTO" data-cost-input="cost-material-de-icamento" />
+                      <span class="toggle-switch" aria-hidden="true"></span>
+                      <span>Material de içamento</span>
+                    </label>
+                    <label class="optional-input" for="cost-material-de-icamento" hidden>
+                      <span>Custo total <b>R$</b></span>
+                      <input id="cost-material-de-icamento" type="number" min="0" step="0.01" placeholder="0,00" disabled />
+                    </label>
+                  </div>
+                </div>
+              </section>
 
               <div class="form-note">
                 <span class="note-mark">i</span>
@@ -144,6 +201,27 @@
                 </div>
               </div>
 
+              <section class="panel cost-breakdown" aria-labelledby="cost-breakdown-title">
+                <div class="panel-heading cost-breakdown-heading">
+                  <div>
+                    <span class="section-index">03</span>
+                    <h2 id="cost-breakdown-title">Composição do custo</h2>
+                  </div>
+                  <span class="sum-badge">mão de obra + opcionais</span>
+                </div>
+                <div class="cost-lines">
+                  <div class="cost-line">
+                    <div><span>Mão de obra</span><small id="labor-cost-per-ton">R$ 0,00 / ton</small></div>
+                    <strong id="labor-cost-total">R$ 0,00</strong>
+                  </div>
+                  <div id="optional-cost-lines"></div>
+                  <div class="cost-line cost-line-total">
+                    <div><span>Custo total da operação</span><small>valor final do cenário</small></div>
+                    <strong id="composed-cost-total">R$ 0,00</strong>
+                  </div>
+                </div>
+              </section>
+
               <section class="panel periods-panel">
                 <div class="panel-heading periods-heading">
                   <div>
@@ -156,7 +234,7 @@
                 <div class="table-wrap">
                   <table>
                     <thead>
-                      <tr><th>Período</th><th>Data de início</th><th>Produção</th><th>Ternos</th><th>Custo</th></tr>
+                      <tr><th>Período</th><th>Data de início</th><th>Produção</th><th>Ternos</th><th>Mão de obra</th></tr>
                     </thead>
                     <tbody id="periods-body"></tbody>
                   </table>

@@ -2,6 +2,17 @@ import type { DataLocal } from './tempo.js';
 
 export type UnidadeDeMedida = 'TON';
 
+export type TipoDeCustoOpcional =
+  | 'MATERIAL_DE_PEACAO'
+  | 'MADEIRA'
+  | 'LOCACAO_DE_MAQUINA'
+  | 'MATERIAL_DE_ICAMENTO';
+
+export interface CustoOpcional {
+  readonly tipo: TipoDeCustoOpcional;
+  readonly custoTotal: number;
+}
+
 export interface InicioDaOperacao {
   readonly data: DataLocal;
   /** Identificador do período conforme o calendário do OGMO. */
@@ -16,6 +27,8 @@ export interface EntradaDeSimulacao {
   readonly volumeToneladas: number;
   readonly produtividadeToneladasPorPeriodo: number;
   readonly totalDeTernos: number;
+  /** Custos totais informados pelo usuário, opcionais à mão de obra. */
+  readonly custosOpcionais?: readonly CustoOpcional[];
   /** Opcional: cenário manual que preserva o total de ternos informado. */
   readonly ternosPorPeriodo?: readonly number[];
 }
@@ -50,6 +63,10 @@ export interface CustoDoPeriodo {
   readonly memoria: readonly LinhaDeMemoria[];
 }
 
+export interface CustoOpcionalCalculado extends CustoOpcional {
+  readonly custoPorTonelada: number;
+}
+
 export interface PeriodoCalculado {
   readonly periodo: PeriodoOgmo;
   readonly producaoToneladas: number;
@@ -62,6 +79,9 @@ export interface ResultadoDeSimulacao {
   readonly quantidadeDePeriodos: number;
   readonly distribuicaoDeTernos: readonly number[];
   readonly periodos: readonly PeriodoCalculado[];
+  readonly custoDeMaoDeObra: number;
+  readonly custosOpcionais: readonly CustoOpcionalCalculado[];
+  readonly custoOpcionalTotal: number;
   readonly custoTotal: number;
   readonly custoPorTonelada: number;
   readonly memoria: readonly LinhaDeMemoria[];

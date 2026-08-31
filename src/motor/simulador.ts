@@ -1,6 +1,7 @@
 import type { CalendarioOgmo } from '../calendario/portas.js';
 import type { CatalogoOgmo } from '../catalogo/portas.js';
 import type {
+  CustoOpcionalCalculado,
   EntradaDeSimulacao,
   LinhaDeMemoria,
   ResultadoDeSimulacao,
@@ -71,12 +72,21 @@ export function simular(
     };
   });
 
-  const custoTotal = calculados.reduce((total, periodo) => total + periodo.custo.total, 0);
+  const custoDeMaoDeObra = calculados.reduce((total, periodo) => total + periodo.custo.total, 0);
+  const custosOpcionais: CustoOpcionalCalculado[] = (entrada.custosOpcionais ?? []).map((custo) => ({
+    ...custo,
+    custoPorTonelada: custo.custoTotal / entrada.volumeToneladas,
+  }));
+  const custoOpcionalTotal = custosOpcionais.reduce((total, custo) => total + custo.custoTotal, 0);
+  const custoTotal = custoDeMaoDeObra + custoOpcionalTotal;
   const memoria: LinhaDeMemoria[] = [
     { descricao: 'Volume total (toneladas)', valor: entrada.volumeToneladas },
     { descricao: 'Produtividade (toneladas por período)', valor: entrada.produtividadeToneladasPorPeriodo },
     { descricao: 'Quantidade de períodos', valor: quantidadeDePeriodos },
     { descricao: 'Total de ternos', valor: entrada.totalDeTernos },
+    { descricao: 'Mão de obra', valor: custoDeMaoDeObra },
+    { descricao: 'Custos opcionais', valor: custoOpcionalTotal },
+    { descricao: 'Custo total', valor: custoTotal },
   ];
 
   return {
@@ -84,6 +94,9 @@ export function simular(
     quantidadeDePeriodos,
     distribuicaoDeTernos,
     periodos: calculados,
+    custoDeMaoDeObra,
+    custosOpcionais,
+    custoOpcionalTotal,
     custoTotal,
     custoPorTonelada: custoTotal / entrada.volumeToneladas,
     memoria,
@@ -100,6 +113,9 @@ function validarEntrada(entrada: EntradaDeSimulacao): void {
   }
   if (!Number.isInteger(entrada.totalDeTernos) || entrada.totalDeTernos < 1) {
     throw new EntradaInvalida('O total de ternos deve ser um inteiro maior que zero.');
+  }
+  if ((entrada.custosOpcionais ?? []).some((custo) => !Number.isFinite(custo.custoTotal) || custo.custoTotal < 0)) {
+    throw new EntradaInvalida('Cada custo opcional deve ser um valor maior ou igual a zero.');
   }
 }
 
