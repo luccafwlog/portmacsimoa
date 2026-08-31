@@ -1,165 +1,50 @@
-# PORTMAC — Simulador de Custo de Operação Portuária
+# PORTMAC — contexto do produto
 
-Aplicação web interna da PORTMAC (Porto de Vitória/ES). Recebe as variáveis de
-um navio e devolve o custo da operação, cujo número-título é **R$ por tonelada**.
+Este repositório contém o núcleo de uma calculadora interna de custo para
+cotação preliminar. O resultado é um cenário calculado, não uma promessa sobre
+o custo final nem uma previsão automática da operação.
 
-Este repositório contém o **núcleo de cálculo**. A especificação de produto vive
-nas issues, sob o mapa [#1](https://github.com/luccafwlog/portmacsimoa/issues/1).
+## Vocabulário decidido
 
-## Como este código se relaciona com a spec
+- **Faina** — a operação que será cotada. Uma simulação trata uma única faina.
+- **Período** — a unidade de tempo usada pelo OGMO. Sua duração, seus nomes e
+  seus multiplicadores vêm do catálogo/calendário oficial; o núcleo não os
+  inventa.
+- **Produtividade** — quantidade total que a operação deve movimentar em um
+  período. É informada pelo usuário e não é multiplicada automaticamente pelos
+  ternos.
+- **Terno** — unidade inteira de recurso que pode ser distribuída entre os
+  períodos da operação. O usuário informa o total; o sistema cria uma
+  distribuição equilibrada e permite uma redistribuição manual posterior.
+- **Catálogo do OGMO** — fonte externa dos valores e regras necessários para
+  calcular o custo de um período. Se faltar dado essencial, a cotação real deve
+  ser recusada.
 
-O mapa produz **decisões**; este repositório produz **o motor que as executa**.
-As duas coisas avançam em paralelo de propósito: a forma do cálculo já está
-determinada pelos documentos lidos, mesmo que os catálogos (tabelas, calendário)
-ainda não estejam em mãos.
+## Fluxo decidido
 
-O que ainda não foi decidido **não foi chutado**. Cada questão aberta aparece de
-uma destas três formas, todas rastreáveis:
+1. O usuário informa faina, data e período de início, volume, produtividade e
+   total de ternos.
+2. O núcleo calcula `ceil(volume / produtividade)` períodos.
+3. O volume é distribuído pela produtividade; o último período pode ser
+   parcial, mas continua sendo um período inteiro requisitado.
+4. Os ternos são distribuídos como inteiros e equilibrados. Uma distribuição
+   explícita só é aceita se tiver a mesma quantidade de períodos e a mesma soma
+   do total informado.
+5. O calendário do OGMO projeta os períodos e o catálogo do OGMO calcula cada
+   custo.
+6. O resultado mostra custo total, custo por tonelada e memória simples por
+   período.
 
-| Forma | Onde | Para quê |
-|---|---|---|
-| **Porta** | `src/catalogo/portas.ts`, `src/calendario/portas.ts` | O dado que falta entra por trás de uma interface. O motor não espera por ele. |
-| **Política** | `src/motor/politicas.ts` | A regra em aberto vira um campo nomeado com default explícito, ligado à issue que a fecha. |
-| **Premissa** | `ResultadoDeSimulacao.premissas` | Toda escolha do motor aparece no resultado. Nenhuma passa por dado do cliente. |
+## Limites do primeiro núcleo
 
-## Vocabulário
+- uma faina por simulação;
+- sem custos opcionais;
+- sem múltiplas cargas ou navios mistos;
+- sem otimização automática;
+- sem relação automática entre quantidade de ternos e produtividade;
+- sem regras de jornada, adicionais, pisos ou valores codificados antes da
+  conferência do catálogo do OGMO;
+- sem UI, banco, autenticação ou histórico.
 
-Provisório enquanto o [#7](https://github.com/luccafwlog/portmacsimoa/issues/7)
-não fecha. O que está marcado **(aberto)** é uso interno deste código, não
-terminologia aprovada.
-
-- **Faina** — a unidade que o catálogo indexa: a carga e a operação sobre ela,
-  com um código (`5.1` granito, `7.5` LO-LO contêiner) e uma **unidade de
-  medida** própria. É por faina que se consulta taxa e composição de equipe.
-- **Unidade de medida** — `TON`, `UND` ou `VOLUME`. Boa parte do catálogo **não**
-  se remunera por tonelada, e um mesmo navio pode ter duas bases ao mesmo tempo
-  ([#17](https://github.com/luccafwlog/portmacsimoa/issues/17)).
-- **Categoria** — conferentes, estivadores, arrumadores, suporte, vigias.
-- **Instrumento** — `ACT` ou `CCT`. Determinado pelo par `(faina, categoria)`,
-  com CCT como default imposto pela norma
-  ([#9](https://github.com/luccafwlog/portmacsimoa/issues/9), resolvido).
-- **Terno** — frente de trabalho. Dimensiona a **equipe**: multiplica as posições
-  de escala `POR_TERNO` e não as de escala `POR_NAVIO`
-  ([#16](https://github.com/luccafwlog/portmacsimoa/issues/16)).
-
-  **Terno não encurta a operação.** Quem dá a duração é a produtividade, e ela é
-  do navio. As duas entram separadas porque a relação entre elas não é linear e
-  quem sabe dela é o operador: se abrir o terceiro terno leva o navio de 400 para
-  550 t/período, é ele quem informa os dois números. O simulador não arbitra esse
-  ganho — arbitrar seria inventar produtividade, que é justamente o que ele não
-  faz.
-
-  O que se sabe na hora de cotar é o **total de ternos do navio**; quantos operam
-  em cada período, não. Por isso o simulador **distribui os ternos linearmente**
-  pelos períodos por padrão, e deixa **ajustar período a período** depois. A
-  distribuição média é um ponto de partida declarado, não uma medição — e é por
-  isso que o ajuste manual existe.
-- **Período** — a jornada de **6 horas**. São **quatro por dia**: `01–07`,
-  `07–13`, `13–19` e `19–01`. É a unidade de requisição, a unidade em que o piso
-  é avaliado e a unidade em que o usuário declara o início da operação.
-
-  Cada período pertence ao **dia civil em que começa** — o `01–07` de sexta é
-  período de sexta, não madrugada de quinta. É o dia de início que o calendário
-  do OGMO classifica (comum, sábado, domingo, feriado) e que determina o
-  multiplicador.
-
-  Para o multiplicador, `07–13` e `13–19` são **diurnos**; `19–01` e `01–07` são
-  **noturnos**.
-- **Produtividade** — quanto **o navio inteiro** move num período, não quanto um
-  terno move. É **input do operador**, não dado de catálogo: quem cota conhece o
-  navio, o guindaste e o berço. O simulador é calculadora, não estimador.
-  Sozinha, ela decide a duração da operação — e portanto quantas vezes o piso é
-  cobrado.
-- **Cota** — o peso de uma função no cálculo da remuneração.
-- **Taxa homem / taxa equipe** — os dois regimes de remuneração. `Conferente =
-  Taxa equipe · Demais = Taxa homem` (OBS do ANEXO I do ACT).
-- **Salário-dia** — o piso por trabalhador e por período **requisitado**, pago
-  mesmo sem produção.
-- **Total c/E.S** — a coluna que a PORTMAC paga; `Base × 2,152842`. É a única
-  que entra na conta ([#11](https://github.com/luccafwlog/portmacsimoa/issues/11)).
-
-## O que o usuário declara
-
-Cinco coisas, e nada mais:
-
-1. **Faina** — o tipo de carga e a operação sobre ela.
-2. **Data e período de início** — ex.: período `01–07` de sexta, 04/09.
-3. **Volume total** do navio.
-4. **Produtividade** do navio, por período.
-5. **Total de ternos** do navio.
-
-O simulador não estima nenhuma dessas. Ele as cruza com os catálogos cadastrados
-e com o calendário do OGMO, e devolve o custo.
-
-O exemplo que fixa o modelo: início no período `01–07` de sexta 04/09, 25
-períodos. O calendário resolve o resto — a operação atravessa sábado 05/09,
-domingo 06/09 e o feriado de 07/09, e cada período já sai com sua classe e seu
-multiplicador. É daí que vem o custo período a período.
-
-## A regra que governa tudo
-
-Por trabalhador e por período requisitado (ACT, Cláusula Quinta, §2º):
-
-```
-remuneração = max( cota × taxa × produção , salário-dia ) × multiplicador_do_período
-```
-
-O tempo **não** multiplica o custo. O que ele faz é decidir quantos períodos são
-requisitados — e cada período requisitado carrega o piso.
-
-**A consequência inverte a intuição comercial.** Navio produtivo: manda a
-produção, e o R$/ton é aproximadamente a taxa. Navio lento ou pequeno: manda o
-piso, e o R$/ton dispara. Dizer qual regime está valendo é a informação mais
-acionável que o simulador dá — por isso `regimeDominante` é campo de primeira
-classe no resultado, não um detalhe da memória de cálculo.
-
-## Mapa do código
-
-```
-src/dominio/     tempo civil sem fuso · tipos do domínio
-src/catalogo/    porta + implementação em memória + semente conferida do ACT
-src/calendario/  porta + calendário por feriados + lista provisória
-src/motor/       políticas · multiplicadores · períodos · equipe · remuneração · simulador
-testes/          testes-âncora: cada número vem do documento, não da nossa cabeça
-```
-
-A dependência aponta só para dentro: o motor conhece as portas, e nada conhece o
-motor. Trocar o mapa em memória por um banco não toca uma linha de cálculo.
-
-## Estado
-
-O que já está no código e conferido contra o documento:
-
-- Fator de encargos 2,152842, verificado em quatro pontos independentes.
-- Os oito multiplicadores de período da Cláusula Sexta.
-- Equipe referência da estiva e da conferência (ANEXO II e III), com escalas.
-- Granito (5.1) sob ACT: taxa homem 0,99, taxa equipe 3,01, salário-dia 410,14.
-
-O que o código **contradiz** e precisa ser corrigido:
-
-- **A jornada.** `src/motor/periodos.ts` implementa dois períodos de 12 h
-  (7–19 e 19–7). São **quatro de 6 h**. Toda a projeção de períodos, o
-  ancoramento do início e a contagem do piso mudam com isso.
-- **A entrada.** O motor pede um instante com hora e minuto e deduz o período.
-  O usuário declara o período diretamente.
-- **Os ternos.** Hoje são um número fixo para a operação inteira. Passam a ser
-  um total distribuído pelos períodos, ajustável.
-
-O que falta, e por quê:
-
-- **A CCT inteira** — fainas 1.1 a 19.x. Não é fase 2: sem ela o simulador só
-  sabe cotar seis fainas ([#2](https://github.com/luccafwlog/portmacsimoa/issues/2)).
-- **O calendário OGMO** — a lista provisória tem só feriados nacionais
-  ([#10](https://github.com/luccafwlog/portmacsimoa/issues/10)).
-- **Um navio real** — é o que valida que o modelo fecha com a realidade em vez
-  de fechar só com a nossa leitura dos documentos.
-- **Salário-dia dos conferentes** — ainda não lido; a linha do catálogo está
-  marcada como pendente e toda simulação que a toca avisa.
-
-## Rodando
-
-```
-npm install
-npm test
-npm run typecheck
-```
+O catálogo fictício usado nos testes serve somente para validar a arquitetura.
+Ele não representa uma cotação oficial.
