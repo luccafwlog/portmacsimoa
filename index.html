@@ -224,25 +224,30 @@
                 </div>
               </section>
 
-              <section class="panel periods-panel">
-                <div class="panel-heading periods-heading">
+              <details class="panel periods-panel">
+                <summary class="panel-heading periods-summary">
                   <div>
                     <span class="section-index">02</span>
-                    <h2>Distribuição da operação</h2>
+                    <h2>Detalhamento por ternos</h2>
                   </div>
-                  <span class="sum-badge">total: <strong id="ternos-total-label">0</strong> ternos</span>
+                  <div class="periods-summary-meta">
+                    <span class="sum-badge">total: <strong id="ternos-total-label">0</strong> ternos</span>
+                    <span class="expand-hint" aria-hidden="true"><span class="expand-label"></span><span class="expand-icon">⌄</span></span>
+                  </div>
+                </summary>
+                <div class="periods-content">
+                  <p class="panel-caption">Ajuste os ternos por período para testar outro cenário. Use de 1 a 3 ternos; a soma precisa permanecer igual.</p>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr><th>Período</th><th>Data de início</th><th>Produção</th><th>Ternos</th><th>Mão de obra</th></tr>
+                      </thead>
+                      <tbody id="periods-body"></tbody>
+                    </table>
+                  </div>
+                  <div id="distribution-status" class="distribution-status" hidden></div>
                 </div>
-                <p class="panel-caption">Ajuste os ternos por período para testar outro cenário. Use de 1 a 3 ternos; a soma precisa permanecer igual.</p>
-                <div class="table-wrap">
-                  <table>
-                    <thead>
-                      <tr><th>Período</th><th>Data de início</th><th>Produção</th><th>Ternos</th><th>Mão de obra</th></tr>
-                    </thead>
-                    <tbody id="periods-body"></tbody>
-                  </table>
-                </div>
-                <div id="distribution-status" class="distribution-status" hidden></div>
-              </section>
+              </details>
 
               <section class="calculation-strip">
                 <div>
