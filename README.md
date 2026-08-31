@@ -29,3 +29,18 @@ npm install
 npm test
 npm run typecheck
 ```
+
+## Deploy no Vercel
+
+O workflow `.github/workflows/vercel-deploy.yml` valida testes, typecheck e
+build em cada PR. PRs do próprio repositório recebem um preview; pushes para
+`main` publicam em produção; execuções manuais seguem a branch escolhida.
+
+Configure estes Repository secrets no GitHub antes do primeiro workflow:
+
+- `VERCEL_TOKEN` — token de acesso do Vercel;
+- `VERCEL_ORG_ID` — `orgId` do `.vercel/project.json`;
+- `VERCEL_PROJECT_ID` — `projectId` do `.vercel/project.json`.
+
+Os arquivos `.vercel/` e `.env*.local` são locais e nunca devem ser
+versionados.
