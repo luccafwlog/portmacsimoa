@@ -60,7 +60,7 @@ export interface EntradaDeSimulacao {
   /** Quantidade padrão de ternos em cada período; o total é derivado. */
   readonly ternosPorPeriodoPadrao?: number;
   readonly totalDeTernos: number;
-  /** Opcional: capacidade customizada de cada período projetado. */
+  /** Opcional: produtividade por terno customizada de cada período projetado. */
   readonly produtividadesPorPeriodo?: readonly number[];
   /** Custos totais informados pelo usuário, opcionais à mão de obra. */
   readonly custosOpcionais?: readonly CustoOpcional[];

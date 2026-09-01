@@ -51,6 +51,19 @@ describe('catálogo documental do PORTMAC', () => {
     expect(custo.memoria[2]?.descricao).toContain('ACT provisória');
   });
 
+  it('não multiplica novamente a produção agregada pelos ternos', () => {
+    const catalogo = new CatalogoPortmac(fainasActProvisorias);
+    const faina = fainasActProvisorias.find((registro) => registro.codigoDaTabela === '7.5.1')!;
+    const custo = catalogo.calcularCustoDoPeriodo({
+      faina,
+      periodo: { ...periodo, data: data(2026, 9, 8), identificador: '07-13' },
+      producaoToneladas: 200,
+      ternos: 2,
+    });
+
+    expect(custo.total).toBeCloseTo(200 * 34.46 * 15.4 * (1 + 1.152877), 6);
+  });
+
   it('mantém a base fixa da faina ACT provisória em salário-dia', () => {
     const catalogo = new CatalogoPortmac(fainasActProvisorias);
     const faina = fainasActProvisorias.find((registro) => registro.codigoDaTabela === '14.1.0')!;
@@ -63,6 +76,19 @@ describe('catálogo documental do PORTMAC', () => {
     });
 
     expect(custo.total).toBeCloseTo(4 * 515.2 * (1 + 1.152877), 6);
+  });
+
+  it('multiplica a composição de salário-dia pela quantidade de ternos', () => {
+    const catalogo = new CatalogoPortmac(fainasActProvisorias);
+    const faina = fainasActProvisorias.find((registro) => registro.codigoDaTabela === '14.1.0')!;
+    const custo = catalogo.calcularCustoDoPeriodo({
+      faina,
+      periodo: { ...periodo, data: data(2026, 9, 8), identificador: '07-13' },
+      producaoToneladas: 999,
+      ternos: 2,
+    });
+
+    expect(custo.total).toBeCloseTo(2 * 4 * 515.2 * (1 + 1.152877), 6);
   });
 
   it('calcula a CCT de contêiner como tarifa unitária, sem multiplicar pelas cotas', () => {

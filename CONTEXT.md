@@ -23,9 +23,9 @@ o custo final nem uma previsão automática da operação.
   19-07 +87,5%; domingo 07-19 +87,5% e 19-07 +134,375%; feriado 07-19
   +100% e 19-07 +150%. O adicional é somado ao preço normal.
   Quando o feriado cai no domingo, somente a tabela de feriado é aplicada.
-- **Produtividade** — quantidade total que a operação deve movimentar em um
-  período. É informada pelo usuário e não é multiplicada automaticamente pelos
-  ternos.
+- **Produtividade** — quantidade movimentada por um terno em um período. É
+  informada pelo usuário; a capacidade nominal do período é a produtividade
+  multiplicada pela quantidade de ternos alocados nele.
 - **Terno** — unidade inteira de recurso alocada em cada período da operação.
   O usuário informa de 1 a 4 ternos por período; o sistema calcula o total
   multiplicando essa quantidade pelos períodos e permite uma redistribuição
@@ -43,11 +43,13 @@ o custo final nem uma previsão automática da operação.
 1. O usuário informa opcionalmente o cliente e informa faina, data e período de
    início, volume, produtividade e ternos por período. O total de ternos é
    calculado automaticamente.
-2. O núcleo calcula `ceil(volume / produtividade)` períodos.
+2. O núcleo calcula `ceil(volume / (produtividade × ternos por período))`
+   períodos.
 3. A partir da data e da faixa inicial, o calendário avança quatro períodos por
    dia e informa a data de início de cada período.
-4. O volume é distribuído pela produtividade; o último período pode ser
-   parcial, mas continua sendo um período inteiro requisitado.
+4. O volume é distribuído pela capacidade de cada período (`produtividade por
+   terno × ternos`); o último período pode ser parcial, mas continua sendo um
+   período inteiro requisitado.
 5. Os ternos são distribuídos como inteiros e equilibrados a partir da
    quantidade informada por período. Uma distribuição explícita aceita de 0 a
    4 ternos por período e só é aceita se tiver a mesma quantidade de períodos e
@@ -82,7 +84,6 @@ o custo final nem uma previsão automática da operação.
 - sem múltiplas cargas ou navios mistos;
 - a grade de produtividade da otimização permanece provisória até a validação
   documental das faixas e limites operacionais;
-- sem relação automática entre quantidade de ternos e produtividade;
 - sem cobertura de feriados municipais, estaduais ou portuários;
 - sem banco, autenticação ou histórico.
 

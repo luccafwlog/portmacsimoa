@@ -32,7 +32,10 @@ export function otimizarCenario(
     )
     .sort((a, b) => a - b)
     .flatMap((produtividade): PontoDeOtimizacao[] => {
-      const periodosEsperados = Math.ceil(entrada.volumeToneladas / produtividade);
+      const capacidadePorPeriodo = entrada.ternosPorPeriodoPadrao === undefined
+        ? produtividade
+        : produtividade * entrada.ternosPorPeriodoPadrao;
+      const periodosEsperados = Math.ceil(entrada.volumeToneladas / capacidadePorPeriodo);
       const totalDeTernos = entrada.ternosPorPeriodoPadrao !== undefined
         ? entrada.ternosPorPeriodoPadrao * periodosEsperados
         : entrada.totalDeTernos;
