@@ -33,15 +33,17 @@ npm run typecheck
 
 ## Deploy no Vercel
 
-O workflow `.github/workflows/vercel-deploy.yml` valida testes, typecheck e
-build em cada PR. PRs do próprio repositório recebem um preview; pushes para
-`main` publicam em produção; execuções manuais seguem a branch escolhida.
+O projeto `portmacsimoa` está vinculado ao repositório GitHub
+`luccafwlog/portmacsimoa` pela integração nativa da Vercel:
 
-Configure estes Repository secrets no GitHub antes do primeiro workflow:
+- cada PR aberta ou atualizada gera um Preview Deployment;
+- cada merge ou push em `main` gera o deploy de produção;
+- o workflow `.github/workflows/vercel-deploy.yml` fica responsável apenas por
+  testes, typecheck e build.
 
-- `VERCEL_TOKEN` — token de acesso do Vercel;
-- `VERCEL_ORG_ID` — `orgId` do `.vercel/project.json`;
-- `VERCEL_PROJECT_ID` — `projectId` do `.vercel/project.json`.
+Não são necessários `VERCEL_TOKEN`, `VERCEL_ORG_ID` ou `VERCEL_PROJECT_ID` como
+secrets para essa integração nativa. O `vercel.json` mantém os comandos de
+instalação, build e diretório de saída usados pelo projeto.
 
 Os arquivos `.vercel/` e `.env*.local` são locais e nunca devem ser
 versionados.
