@@ -120,12 +120,16 @@ function calcularCustoComposicaoProvisoria(
     ? contexto.producaoToneladas
     : 1;
   const fatorEncargos = 1 + regra.encargosContribuicaoAdicional;
-  const memoria = regra.composicao.map((item) => {
-    const custoBase = item.cotas * regra.taxaBase * quantidadeBase;
+  const itens = regra.baseDeCalculo === 'TARIFA_UNITARIA'
+    ? [{ categoria: 'Tarifa CCT', homens: 0, cotas: 0, funcoes: [] as readonly string[] }]
+    : regra.composicao;
+  const memoria = itens.map((item) => {
+    const fatorDaEquipe = regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 1 : item.cotas;
+    const custoBase = fatorDaEquipe * regra.taxaBase * quantidadeBase;
     const custoTotal = custoBase * fatorEncargos * majoracao.fator * contexto.ternos;
     const unidade = regra.regime === 'PRODUCAO' ? 'produção do período' : 'salário-dia';
     return {
-      descricao: `${item.categoria} · ${item.homens} homens · ${item.cotas} cotas agregadas × ${regra.taxaBase.toFixed(4)} · ${unidade} · ${descricaoDoAdicional(majoracao.adicionalPercentual)} · ${contexto.ternos} terno(s)`,
+      descricao: `${item.categoria} · ${item.homens} homens · ${regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 'tarifa unitária' : `${item.cotas} cotas agregadas`} × ${regra.taxaBase.toFixed(4)} · ${unidade} · ${descricaoDoAdicional(majoracao.adicionalPercentual)} · ${contexto.ternos} terno(s)`,
       valor: custoTotal,
     };
   });
@@ -137,7 +141,7 @@ function calcularCustoComposicaoProvisoria(
     memoria: [
       ...memoria,
       {
-        descricao: `Fonte: ${faina.fonte} provisória · ${faina.codigoDaTabela ?? faina.codigo} · encargos/contribuições +${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(regra.encargosContribuicaoAdicional * 100)}% · ${majoracao.descricao}`,
+        descricao: `Fonte: ${faina.fonte} provisória · ${faina.codigoDaTabela ?? faina.codigo} · ${regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 'tarifa unitária; composição não multiplicada por cotas' : 'cotas da equipe'} · encargos/contribuições +${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(regra.encargosContribuicaoAdicional * 100)}% · ${majoracao.descricao}`,
         valor: total,
       },
     ],

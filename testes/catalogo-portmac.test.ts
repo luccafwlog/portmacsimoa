@@ -65,6 +65,15 @@ describe('catálogo documental do PORTMAC', () => {
     expect(custo.total).toBeCloseTo(4 * 515.2 * (1 + 1.152877), 6);
   });
 
+  it('calcula a CCT de contêiner como tarifa unitária, sem multiplicar pelas cotas', () => {
+    const catalogo = new CatalogoPortmac([], fainasCctProvisorias);
+    const faina = fainasCctProvisorias.find((registro) => registro.codigoDaTabela === '6.0')!;
+    const custo = catalogo.calcularCustoDoPeriodo({ faina, periodo, producaoToneladas: 20, ternos: 1 });
+
+    expect(custo.total).toBeCloseTo(20 * 0.9625 * (1 + 1.152877) * 1.25, 6);
+    expect(custo.memoria[0]?.descricao).toContain('tarifa unitária');
+  });
+
   it('cadastra somente as fainas CCT mapeadas na planilha provisória', () => {
     expect(fainasCctIniciais).toEqual(fainasCctProvisorias);
     expect(new Set(fainasCctIniciais.map((faina) => faina.codigo)).size)

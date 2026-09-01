@@ -6,6 +6,7 @@ import type {
 import type { CatalogoOgmo } from '../src/catalogo/portas.js';
 import type { PeriodoOgmo } from '../src/dominio/tipos.js';
 import { EntradaInvalida, simular } from '../src/motor/simulador.js';
+import { otimizarCenario } from '../src/motor/otimizador.js';
 
 const catalogo: CatalogoOgmo = {
   listarFainas() {
@@ -119,6 +120,49 @@ describe('simulador mínimo', () => {
     expect(resultado.periodos.map((p) => p.ternos)).toEqual([1, 2]);
   });
 
+  it('usa a produtividade customizada de cada período e limita o último ao volume restante', () => {
+    const resultado = simular(
+      {
+        ...entrada,
+        volumeToneladas: 20,
+        produtividadeToneladasPorPeriodo: 10,
+        totalDeTernos: 3,
+        produtividadesPorPeriodo: [6, 14],
+      },
+      catalogo,
+      calendario,
+    );
+
+    expect(resultado.periodos.map((periodo) => periodo.producaoToneladas)).toEqual([6, 14]);
+    expect(resultado.entrada.produtividadesPorPeriodo).toEqual([6, 14]);
+  });
+
+  it('recusa produtividade customizada diferente do volume da operação', () => {
+    expect(() => simular(
+      {
+        ...entrada,
+        volumeToneladas: 20,
+        produtividadeToneladasPorPeriodo: 10,
+        totalDeTernos: 3,
+        produtividadesPorPeriodo: [6, 13],
+      },
+      catalogo,
+      calendario,
+    )).toThrow('exatamente igual ao volume');
+
+    expect(() => simular(
+      {
+        ...entrada,
+        volumeToneladas: 20,
+        produtividadeToneladasPorPeriodo: 10,
+        totalDeTernos: 3,
+        produtividadesPorPeriodo: [7, 14],
+      },
+      catalogo,
+      calendario,
+    )).toThrow('exatamente igual ao volume');
+  });
+
   it('aceita períodos sem terno quando a distribuição preserva o total', () => {
     const resultado = simular(
       {
@@ -149,6 +193,61 @@ describe('simulador mínimo', () => {
     )).toThrow('máximo de 4 ternos');
   });
 
+  it('deriva e valida o total de ternos a partir dos ternos por período', () => {
+    const resultado = simular(
+      {
+        ...entrada,
+        volumeToneladas: 20,
+        produtividadeToneladasPorPeriodo: 10,
+        ternosPorPeriodoPadrao: 2,
+        totalDeTernos: 4,
+      },
+      catalogo,
+      calendario,
+    );
+
+    expect(resultado.distribuicaoDeTernos).toEqual([2, 2]);
+    expect(() => simular(
+      {
+        ...entrada,
+        volumeToneladas: 20,
+        produtividadeToneladasPorPeriodo: 10,
+        ternosPorPeriodoPadrao: 2,
+        totalDeTernos: 3,
+      },
+      catalogo,
+      calendario,
+    )).toThrow('períodos multiplicados pelos ternos por período');
+  });
+
+  it('considera os ternos por período no custo de mão de obra', () => {
+    const umTerno = simular(
+      {
+        ...entrada,
+        volumeToneladas: 20,
+        produtividadeToneladasPorPeriodo: 10,
+        ternosPorPeriodoPadrao: 1,
+        totalDeTernos: 2,
+      },
+      catalogo,
+      calendario,
+    );
+    const doisTernos = simular(
+      {
+        ...entrada,
+        volumeToneladas: 20,
+        produtividadeToneladasPorPeriodo: 10,
+        ternosPorPeriodoPadrao: 2,
+        totalDeTernos: 4,
+      },
+      catalogo,
+      calendario,
+    );
+
+    expect(doisTernos.periodos.every((periodo) => periodo.ternos === 2)).toBe(true);
+    expect(doisTernos.custoDeMaoDeObra).toBeGreaterThan(umTerno.custoDeMaoDeObra);
+  });
+
   it('soma custos opcionais ao total e calcula seu valor por tonelada', () => {
     const resultado = simular(
       {
@@ -167,6 +266,54 @@ describe('simulador mínimo', () => {
     expect(resultado.custoOpcionalTotal).toBe(1000);
     expect(resultado.custoTotal).toBe(1500);
     expect(resultado.custoPorTonelada).toBe(75);
+  });
+
+  it('calcula o ótimo em uma grade independente da produtividade informada', () => {
+    const entradaComProdutividadeBaixa = {
+      ...entrada,
+      volumeToneladas: 20,
+      produtividadeToneladasPorPeriodo: 5,
+      totalDeTernos: 3,
+      produtividadesPorPeriodo: [5, 5, 5, 5],
+    };
+    const { produtividadesPorPeriodo: _produtividades, ...entradaSemAjustes } = entradaComProdutividadeBaixa;
+    const entradaComProdutividadeAlta = {
+      ...entradaSemAjustes,
+      produtividadeToneladasPorPeriodo: 20,
+    };
+
+    const primeiraAnalise = otimizarCenario(
+      entradaComProdutividadeBaixa,
+      catalogo,
+      calendario,
+      [5, 10, 20],
+    );
+    const segundaAnalise = otimizarCenario(
+      entradaComProdutividadeAlta,
+      catalogo,
+      calendario,
+      [5, 10, 20],
+    );
+
+    expect(primeiraAnalise.melhor?.produtividade).toBe(20);
+    expect(segundaAnalise.melhor?.produtividade).toBe(20);
+    expect(primeiraAnalise.melhor?.periodos).toBe(1);
+    expect(primeiraAnalise.candidatos.map((candidato) => candidato.produtividade)).toEqual([10, 20]);
+    expect(primeiraAnalise.melhor?.resultado.periodos.reduce((total, periodo) => total + periodo.producaoToneladas, 0)).toBe(20);
+
+    const analiseComDoisTernos = otimizarCenario(
+      {
+        ...entradaSemAjustes,
+        volumeToneladas: 20,
+        produtividadeToneladasPorPeriodo: 10,
+        ternosPorPeriodoPadrao: 2,
+        totalDeTernos: 4,
+      },
+      catalogo,
+      calendario,
+      [5, 10, 20],
+    );
+    expect(analiseComDoisTernos.candidatos.map((candidato) => candidato.resultado.entrada.totalDeTernos)).toEqual([8, 4, 2]);
   });
 
   it('aceita vários custos opcionais personalizados com descrição', () => {
