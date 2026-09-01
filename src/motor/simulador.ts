@@ -39,8 +39,12 @@ export function simular(
       `A faina ${faina.descricao} está cadastrada, mas ainda não está validada para cálculo.`,
     );
   }
+  const ternosPadrao = entrada.ternosPorPeriodoPadrao;
+  const capacidadePorPeriodo = ternosPadrao === undefined
+    ? entrada.produtividadeToneladasPorPeriodo
+    : entrada.produtividadeToneladasPorPeriodo * ternosPadrao;
   const quantidadeDePeriodos = Math.ceil(
-    entrada.volumeToneladas / entrada.produtividadeToneladasPorPeriodo,
+    entrada.volumeToneladas / capacidadePorPeriodo,
   );
   if (entrada.ternosPorPeriodoPadrao !== undefined) {
     if (!Number.isInteger(entrada.ternosPorPeriodoPadrao) || entrada.ternosPorPeriodoPadrao < 1 || entrada.ternosPorPeriodoPadrao > 4) {
@@ -59,7 +63,7 @@ export function simular(
     ? validarDistribuicao(entrada.ternosPorPeriodo, quantidadeDePeriodos, entrada.totalDeTernos)
     : distribuirTernos(entrada.totalDeTernos, quantidadeDePeriodos);
   const produtividadesPorPeriodo = entrada.produtividadesPorPeriodo
-    ? validarProdutividades(entrada.produtividadesPorPeriodo, quantidadeDePeriodos, entrada.volumeToneladas)
+    ? validarProdutividades(entrada.produtividadesPorPeriodo, quantidadeDePeriodos, entrada.volumeToneladas, distribuicaoDeTernos, ternosPadrao !== undefined)
     : Array.from({ length: quantidadeDePeriodos }, () => entrada.produtividadeToneladasPorPeriodo);
   const periodos = calendario.projetar(entrada.inicio, quantidadeDePeriodos);
   if (periodos.length !== quantidadeDePeriodos) {
@@ -71,7 +75,7 @@ export function simular(
   let restante = entrada.volumeToneladas;
   const calculados = periodos.map((periodo, indice) => {
     const producaoToneladas = Math.min(
-      produtividadesPorPeriodo[indice]!,
+      produtividadesPorPeriodo[indice]! * (ternosPadrao === undefined ? 1 : distribuicaoDeTernos[indice]!),
       restante,
     );
     restante -= producaoToneladas;
@@ -98,6 +102,9 @@ export function simular(
       custo,
     };
   });
+  if (restante > 0.0001) {
+    throw new EntradaInvalida('A produtividade distribuída não cobre todo o volume da operação.');
+  }
 
   const custoDeMaoDeObra = calculados.reduce((total, periodo) => total + periodo.custo.total, 0);
   const custosOpcionais: CustoOpcionalCalculado[] = (entrada.custosOpcionais ?? []).map((custo) => ({
@@ -109,7 +116,8 @@ export function simular(
   const unidadeOperacional = nomeDaUnidade(faina.unidade);
   const memoria: LinhaDeMemoria[] = [
     { descricao: `Quantidade total (${unidadeOperacional})`, valor: entrada.volumeToneladas },
-    { descricao: `Capacidade (${unidadeOperacional} por período)`, valor: entrada.produtividadeToneladasPorPeriodo },
+    { descricao: `Produtividade (${unidadeOperacional} por terno por período)`, valor: entrada.produtividadeToneladasPorPeriodo },
+    { descricao: `Capacidade nominal (${unidadeOperacional} por período)`, valor: capacidadePorPeriodo },
     { descricao: 'Quantidade de períodos', valor: quantidadeDePeriodos },
     { descricao: 'Total de ternos', valor: entrada.totalDeTernos },
     { descricao: 'Mão de obra', valor: custoDeMaoDeObra },
@@ -148,6 +156,9 @@ function validarEntrada(entrada: EntradaDeSimulacao): void {
   }
   if (entrada.produtividadeToneladasPorPeriodo <= 0) {
     throw new EntradaInvalida('A produtividade deve ser maior que zero.');
+  }
+  if (entrada.ternosPorPeriodoPadrao !== undefined && (!Number.isInteger(entrada.ternosPorPeriodoPadrao) || entrada.ternosPorPeriodoPadrao < 1 || entrada.ternosPorPeriodoPadrao > 4)) {
+    throw new EntradaInvalida('Os ternos por período devem ser um inteiro entre 1 e 4.');
   }
   if (!Number.isInteger(entrada.totalDeTernos) || entrada.totalDeTernos < 1) {
     throw new EntradaInvalida('O total de ternos deve ser um inteiro maior que zero.');
@@ -189,6 +200,8 @@ function validarProdutividades(
   produtividades: readonly number[],
   periodos: number,
   volume: number,
+  ternosPorPeriodo: readonly number[],
+  produtividadePorTerno: boolean,
 ): readonly number[] {
   if (produtividades.length !== periodos) {
     throw new EntradaInvalida('A produtividade precisa ter um valor por período.');
@@ -196,9 +209,12 @@ function validarProdutividades(
   if (produtividades.some((produtividade) => !Number.isFinite(produtividade) || produtividade <= 0)) {
     throw new EntradaInvalida('Cada produtividade por período deve ser maior que zero.');
   }
-  const total = produtividades.reduce((soma, produtividade) => soma + produtividade, 0);
-  if (Math.abs(total - volume) > 0.0001) {
-    throw new EntradaInvalida('A soma das produtividades por período deve ser exatamente igual ao volume da operação.');
+  const capacidade = produtividades.reduce((soma, produtividade, indice) =>
+    soma + produtividade * (produtividadePorTerno ? ternosPorPeriodo[indice]! : 1), 0);
+  if (produtividadePorTerno ? capacidade + 0.0001 < volume : Math.abs(capacidade - volume) > 0.0001) {
+    throw new EntradaInvalida(produtividadePorTerno
+      ? 'A capacidade das produtividades por terno deve cobrir todo o volume da operação.'
+      : 'A soma das produtividades por período deve ser exatamente igual ao volume da operação.');
   }
   return produtividades;
 }

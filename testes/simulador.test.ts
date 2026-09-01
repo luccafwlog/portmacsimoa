@@ -200,13 +200,15 @@ describe('simulador mínimo', () => {
         volumeToneladas: 20,
         produtividadeToneladasPorPeriodo: 10,
         ternosPorPeriodoPadrao: 2,
-        totalDeTernos: 4,
+        totalDeTernos: 2,
       },
       catalogo,
       calendario,
     );
 
-    expect(resultado.distribuicaoDeTernos).toEqual([2, 2]);
+    expect(resultado.quantidadeDePeriodos).toBe(1);
+    expect(resultado.distribuicaoDeTernos).toEqual([2]);
+    expect(resultado.periodos[0]?.producaoToneladas).toBe(20);
     expect(() => simular(
       {
         ...entrada,
@@ -224,10 +226,10 @@ describe('simulador mínimo', () => {
     const umTerno = simular(
       {
         ...entrada,
-        volumeToneladas: 20,
+        volumeToneladas: 10,
         produtividadeToneladasPorPeriodo: 10,
         ternosPorPeriodoPadrao: 1,
-        totalDeTernos: 2,
+        totalDeTernos: 1,
       },
       catalogo,
       calendario,
@@ -235,10 +237,10 @@ describe('simulador mínimo', () => {
     const doisTernos = simular(
       {
         ...entrada,
-        volumeToneladas: 20,
+        volumeToneladas: 10,
         produtividadeToneladasPorPeriodo: 10,
         ternosPorPeriodoPadrao: 2,
-        totalDeTernos: 4,
+        totalDeTernos: 2,
       },
       catalogo,
       calendario,
@@ -246,6 +248,24 @@ describe('simulador mínimo', () => {
 
     expect(doisTernos.periodos.every((periodo) => periodo.ternos === 2)).toBe(true);
     expect(doisTernos.custoDeMaoDeObra).toBeGreaterThan(umTerno.custoDeMaoDeObra);
+  });
+
+  it('aplica a produtividade por terno a cada terno do período', () => {
+    const resultado = simular(
+      {
+        ...entrada,
+        volumeToneladas: 30,
+        produtividadeToneladasPorPeriodo: 10,
+        ternosPorPeriodoPadrao: 2,
+        totalDeTernos: 4,
+        ternosPorPeriodo: [2, 2],
+        produtividadesPorPeriodo: [5, 10],
+      },
+      catalogo,
+      calendario,
+    );
+
+    expect(resultado.periodos.map((periodo) => periodo.producaoToneladas)).toEqual([10, 20]);
   });
 
   it('soma custos opcionais ao total e calcula seu valor por tonelada', () => {
@@ -313,7 +333,7 @@ describe('simulador mínimo', () => {
       calendario,
       [5, 10, 20],
     );
-    expect(analiseComDoisTernos.candidatos.map((candidato) => candidato.resultado.entrada.totalDeTernos)).toEqual([8, 4, 2]);
+    expect(analiseComDoisTernos.candidatos.map((candidato) => candidato.resultado.entrada.totalDeTernos)).toEqual([4, 2, 2]);
   });
 
   it('aceita vários custos opcionais personalizados com descrição', () => {

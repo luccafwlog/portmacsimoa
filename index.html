@@ -82,13 +82,13 @@
                     <input id="volume" type="number" min="0.01" step="0.01" placeholder="Informe a quantidade" required />
                   </label>
                   <label class="field">
-                    <span id="productivity-field-label">Produtividade <b>ton / período</b></span>
+                    <span id="productivity-field-label">Produtividade por terno <b>ton / terno / período</b></span>
                     <input id="produtividade" type="number" min="0.01" step="0.01" placeholder="Informe a capacidade" required />
                   </label>
                   <div class="period-preview" aria-live="polite">
                     <div>
                       <span class="preview-label">TOTAL DE PERÍODOS CALCULADOS</span>
-                      <small>volume ÷ produtividade, arredondado para cima</small>
+                      <small>volume ÷ (produtividade × ternos por período), arredondado para cima</small>
                     </div>
                     <strong id="calculated-periods">—</strong>
                   </div>
@@ -194,7 +194,7 @@
                   <div class="table-wrap ternos-editor-table-wrap">
                     <table>
                       <thead>
-                        <tr><th>Período</th><th>Data de início</th><th>Produtividade</th><th>Ternos</th><th>Remuneração</th><th>Mão de obra</th></tr>
+                        <tr><th>Período</th><th>Data de início</th><th>Produtividade / terno / período</th><th>Ternos</th><th>Remuneração</th><th>Mão de obra</th></tr>
                       </thead>
                       <tbody id="ternos-editor-body"></tbody>
                     </table>

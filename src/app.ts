@@ -202,7 +202,7 @@ function renderSavedBudgetDetails(resultado: ResultadoDeSimulacao, faina?: Retur
         <div><span>Faina</span><strong>${escapeHtml(faina?.descricao ?? entrada.faina)}</strong></div>
         <div><span>Início</span><strong>${formatarDataPtBr(entrada.inicio.data)} · ${escapeHtml(entrada.inicio.periodo)}</strong></div>
         <div><span>Quantidade</span><strong>${number(entrada.volumeToneladas)} ${unidade.abreviacao}</strong></div>
-        <div><span>Produtividade-base</span><strong>${number(entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/período</strong></div>
+        <div><span>Produtividade-base</span><strong>${number(entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/terno/período</strong></div>
         <div><span>Períodos calculados</span><strong>${number(resultado.quantidadeDePeriodos)}</strong></div>
         <div><span>Ternos por período</span><strong>${number(entrada.ternosPorPeriodoPadrao ?? (resultado.quantidadeDePeriodos ? entrada.totalDeTernos / resultado.quantidadeDePeriodos : 0))}</strong></div>
         <div><span>Total de ternos calculado</span><strong>${number(entrada.totalDeTernos)}</strong></div>
@@ -210,8 +210,8 @@ function renderSavedBudgetDetails(resultado: ResultadoDeSimulacao, faina?: Retur
     </div>
     <div class="saved-scenario-section">
       <span class="saved-scenario-caption">Composição por período</span>
-      <div class="saved-period-table-wrap"><table class="saved-period-table"><thead><tr><th>Data</th><th>Período</th><th>Produção</th><th>Ternos</th><th>Majoração</th><th>Custo</th></tr></thead><tbody>
-        ${resultado.periodos.map((periodo) => `<tr><td>${formatarDataPtBr(periodo.periodo.data)}</td><td>${escapeHtml(periodo.periodo.identificador)}</td><td>${number(periodo.producaoToneladas)} ${unidade.abreviacao}</td><td>${number(periodo.ternos)}</td><td>${escapeHtml(periodo.custo.majoracao?.descricao ?? 'preço normal')}</td><td>${money(periodo.custo.total)}</td></tr>`).join('')}
+      <div class="saved-period-table-wrap"><table class="saved-period-table"><thead><tr><th>Data</th><th>Período</th><th>Produtividade / terno</th><th>Produção</th><th>Ternos</th><th>Majoração</th><th>Custo</th></tr></thead><tbody>
+        ${resultado.periodos.map((periodo, indice) => `<tr><td>${formatarDataPtBr(periodo.periodo.data)}</td><td>${escapeHtml(periodo.periodo.identificador)}</td><td>${number(resultado.entrada.produtividadesPorPeriodo?.[indice] ?? resultado.entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/terno</td><td>${number(periodo.producaoToneladas)} ${unidade.abreviacao}</td><td>${number(periodo.ternos)}</td><td>${escapeHtml(periodo.custo.majoracao?.descricao ?? 'preço normal')}</td><td>${money(periodo.custo.total)}</td></tr>`).join('')}
       </tbody></table></div>
     </div>
     <div class="saved-scenario-section saved-period-memory">
@@ -244,9 +244,13 @@ function renderCatalogMethod(
   regra: NonNullable<ReturnType<typeof catalogoPortmac.listarRegistros>[number]['regraActProvisoria'] | ReturnType<typeof catalogoPortmac.listarRegistros>[number]['regraCctProvisoria']>,
 ): string {
   const fator = regra.baseDeCalculo === 'TARIFA_UNITARIA' ? '1 tarifa unitária' : 'cotas da equipe';
-  const formula = regra.baseDeCalculo === 'TARIFA_UNITARIA'
-    ? 'tarifa-base × produção do período × encargos × majoração × ternos'
-    : 'cotas × tarifa-base × produção do período × encargos × majoração × ternos';
+  const formula = regra.regime === 'PRODUCAO'
+    ? regra.baseDeCalculo === 'TARIFA_UNITARIA'
+      ? 'tarifa-base × produção agregada dos ternos × encargos × majoração'
+      : 'cotas × tarifa-base × produção agregada dos ternos × encargos × majoração'
+    : regra.baseDeCalculo === 'TARIFA_UNITARIA'
+      ? 'tarifa-base × encargos × majoração × ternos'
+      : 'cotas × tarifa-base × encargos × majoração × ternos';
   const composition = regra.composicao.map((item) =>
     `<li>${escapeHtml(item.categoria)}: ${item.homens} homens · ${number(item.cotas)} cotas${item.funcoes.length ? ` · ${escapeHtml(item.funcoes.join(', '))}` : ''}</li>`,
   ).join('');
@@ -261,7 +265,9 @@ function renderCatalogMethod(
       <div><span>Encargos</span><strong>+${number(regra.encargosContribuicaoAdicional * 100)}%</strong></div>
       <div><span>Fonte</span><strong>${escapeHtml(registro.fonte)} · ${escapeHtml(registro.codigoDaTabela ?? registro.codigo)}</strong></div>
     </div>
-    <p class="catalog-method-note">${regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 'A tarifa já representa o valor por unidade produzida. A composição abaixo é informativa e não multiplica o custo.' : 'A taxa é distribuída pelas cotas da composição e multiplicada pela quantidade de ternos.'}</p>
+    <p class="catalog-method-note">${regra.regime === 'PRODUCAO'
+      ? 'A produtividade informada é por terno; a produção do período já representa a soma da produtividade dos ternos alocados e não é multiplicada novamente.'
+      : 'A remuneração é calculada por terno e multiplicada pela quantidade de ternos do período.'}</p>
     <ul>${composition}</ul>
   </div>`;
 }
@@ -388,9 +394,11 @@ function render(resultado: ResultadoDeSimulacao): void {
   setText('#calculated-periods', String(resultado.quantidadeDePeriodos));
   const produtividades = resultado.entrada.produtividadesPorPeriodo;
   const produtividadeCustomizada = produtividades?.some((produtividade) => produtividade !== resultado.entrada.produtividadeToneladasPorPeriodo) ?? false;
+  const ternosPorPeriodo = resultado.entrada.ternosPorPeriodoPadrao
+    ?? (resultado.quantidadeDePeriodos ? resultado.entrada.totalDeTernos / resultado.quantidadeDePeriodos : 0);
   setText('#calculation-summary', produtividadeCustomizada
-    ? `${number(resultado.entrada.volumeToneladas)} ${unidade.abreviacao} ÷ produtividade ajustada por período = ${resultado.quantidadeDePeriodos} períodos · calendário de Vila Velha aplicado`
-    : `${number(resultado.entrada.volumeToneladas)} ${unidade.abreviacao} ÷ ${number(resultado.entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/período = ${resultado.quantidadeDePeriodos} períodos · calendário de Vila Velha aplicado`);
+    ? `${number(resultado.entrada.volumeToneladas)} ${unidade.abreviacao} ÷ (produtividade por terno ajustada × ternos por período) = ${resultado.quantidadeDePeriodos} períodos · ${number(ternosPorPeriodo)} terno(s)/período · calendário de Vila Velha aplicado`
+    : `${number(resultado.entrada.volumeToneladas)} ${unidade.abreviacao} ÷ (${number(resultado.entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/terno/período × ${number(ternosPorPeriodo)} terno(s)) = ${resultado.quantidadeDePeriodos} períodos · calendário de Vila Velha aplicado`);
   renderCalculationMemory(resultado);
   renderPeriodCostChart(resultado);
   renderProductivitySensitivity(resultado);
@@ -501,7 +509,8 @@ function gerarGradePorPeriodos(entrada: EntradaDeSimulacao): readonly number[] {
   const periodoMaximo = 36;
   return Array.from({ length: periodoMaximo - periodoMinimo + 1 }, (_, indice) => {
     const periodos = periodoMinimo + indice;
-    return Number((entrada.volumeToneladas / periodos).toFixed(2));
+    const ternosPorPeriodo = entrada.ternosPorPeriodoPadrao ?? 1;
+    return Number((entrada.volumeToneladas / (periodos * ternosPorPeriodo)).toFixed(2));
   });
 }
 
@@ -524,7 +533,7 @@ function renderProductivitySensitivity(resultado: ResultadoDeSimulacao): void {
   if (summary) {
     const ternosPorPeriodo = resultado.entrada.ternosPorPeriodoPadrao
       ?? (resultado.quantidadeDePeriodos ? resultado.entrada.totalDeTernos / resultado.quantidadeDePeriodos : 0);
-    summary.textContent = `Ótimo calculado: ${number(pontoOtimo.produtividade)} ${unidade.abreviacao}/período · ${number(pontoOtimo.periodos)} períodos · ${number(ternosPorPeriodo)} terno(s)/período · ${money(pontoOtimo.resultado.custoPorTonelada)} por ${unidade.singular}`;
+    summary.textContent = `Ótimo calculado: ${number(pontoOtimo.produtividade)} ${unidade.abreviacao}/terno/período · ${number(pontoOtimo.periodos)} períodos · ${number(ternosPorPeriodo)} terno(s)/período · ${money(pontoOtimo.resultado.custoPorTonelada)} por ${unidade.singular}`;
   }
   const custos = pontosDoGrafico.map((ponto) => ponto.custoPorTonelada);
   const menorCusto = Math.min(...custos);
@@ -553,10 +562,10 @@ function renderProductivitySensitivity(resultado: ResultadoDeSimulacao): void {
   }).join('');
   const line = pontosDoGrafico.map((ponto, indice) => `${indice === 0 ? 'M' : 'L'} ${x(ponto.produtividade).toFixed(2)} ${y(ponto.custoPorTonelada).toFixed(2)}`).join(' ');
   const optimalGuide = `<line class="sensitivity-optimal-guide" x1="${x(pontoOtimo.produtividade).toFixed(2)}" y1="${top}" x2="${x(pontoOtimo.produtividade).toFixed(2)}" y2="${top + plotHeight}" /><text class="sensitivity-optimal-guide-label" x="${x(pontoOtimo.produtividade).toFixed(2)}" y="${top - 7}">ótimo</text>`;
-  const points = pontosDoGrafico.map((ponto, indice) => `<circle class="sensitivity-point${ponto.produtividade === pontoOtimo.produtividade ? ' is-optimal' : ''}" cx="${x(ponto.produtividade).toFixed(2)}" cy="${y(ponto.custoPorTonelada).toFixed(2)}" r="6"><title>${number(ponto.produtividade)} / período · ${number(ponto.periodos)} períodos · ${money(ponto.custoPorTonelada)} por ${unidade.singular}</title></circle>
+  const points = pontosDoGrafico.map((ponto, indice) => `<circle class="sensitivity-point${ponto.produtividade === pontoOtimo.produtividade ? ' is-optimal' : ''}" cx="${x(ponto.produtividade).toFixed(2)}" cy="${y(ponto.custoPorTonelada).toFixed(2)}" r="6"><title>${number(ponto.produtividade)} / terno / período · ${number(ponto.periodos)} períodos · ${money(ponto.custoPorTonelada)} por ${unidade.singular}</title></circle>
     <text class="chart-axis-label chart-axis-label-x" x="${x(ponto.produtividade).toFixed(2)}" y="${height - bottom + 24}">${indice % labelEvery === 0 ? escapeHtml(number(ponto.produtividade)) : ''}</text>`).join('');
   container.setAttribute('role', 'img');
-  container.setAttribute('aria-label', `Análise de sensibilidade. O custo por ${unidade.singular} varia de ${money(menorCusto)} a ${money(maiorCusto)}. O ótimo estimado é ${number(pontoOtimo.produtividade)} ${unidade.abreviacao} por período.`);
+  container.setAttribute('aria-label', `Análise de sensibilidade. O custo por ${unidade.singular} varia de ${money(menorCusto)} a ${money(maiorCusto)}. O ótimo estimado é ${number(pontoOtimo.produtividade)} ${unidade.abreviacao} por terno por período.`);
   container.innerHTML = `<svg class="period-cost-chart-svg sensitivity-chart-svg" viewBox="0 0 ${width} ${height}" aria-hidden="true" focusable="false">
     <text class="chart-axis-title chart-axis-title-y" x="24" y="${top + plotHeight / 2}" transform="rotate(-90 24 ${top + plotHeight / 2})">Custo por ${escapeHtml(unidade.singular)} (R$)</text>
     ${grid}
@@ -565,9 +574,9 @@ function renderProductivitySensitivity(resultado: ResultadoDeSimulacao): void {
     ${optimalGuide}
     <path class="sensitivity-line" d="${line}" />
     ${points}
-    <text class="chart-axis-title chart-axis-title-x" x="${left + plotWidth / 2}" y="${height - 12}">Produtividade / período</text>
+    <text class="chart-axis-title chart-axis-title-x" x="${left + plotWidth / 2}" y="${height - 12}">Produtividade / terno / período</text>
   </svg>
-  <div class="sensitivity-table-wrap"><table class="sensitivity-table"><thead><tr><th>Produtividade / período</th><th>Períodos</th><th>Custo por ${escapeHtml(unidade.singular)}</th></tr></thead><tbody>
+  <div class="sensitivity-table-wrap"><table class="sensitivity-table"><thead><tr><th>Produtividade / terno / período</th><th>Períodos</th><th>Custo por ${escapeHtml(unidade.singular)}</th></tr></thead><tbody>
     ${pontosDaTabela.map((ponto) => `<tr class="${ponto.produtividade === base ? 'is-base' : ''}${ponto.produtividade === pontoOtimo.produtividade ? ' is-optimal' : ''}"><td>${number(ponto.produtividade)}${ponto.produtividade === base ? ' <span class="sensitivity-base-label">base</span>' : ''}${ponto.produtividade === pontoOtimo.produtividade ? ' <span class="sensitivity-optimal-label">ótimo</span>' : ''}</td><td>${number(ponto.periodos)}</td><td>${money(ponto.custoPorTonelada)}</td></tr>`).join('')}
   </tbody></table></div>`;
 }
@@ -629,16 +638,16 @@ function printSavedBudget(id?: string): void {
   <section class="print-report-section"><h2>Dados da operação</h2><div class="print-report-grid">
     <div><span>Início</span><strong>${formatarDataPtBr(budget.resultado.entrada.inicio.data)} · ${escapeHtml(budget.resultado.entrada.inicio.periodo)}</strong></div>
     <div><span>Quantidade</span><strong>${number(budget.resultado.entrada.volumeToneladas)} ${unidade.abreviacao}</strong></div>
-    <div><span>Produtividade-base</span><strong>${number(budget.resultado.entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/período</strong></div>
+    <div><span>Produtividade-base</span><strong>${number(budget.resultado.entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/terno/período</strong></div>
     <div><span>Períodos</span><strong>${number(budget.resultado.quantidadeDePeriodos)}</strong></div>
     <div><span>Ternos por período</span><strong>${number(budget.resultado.entrada.ternosPorPeriodoPadrao ?? (budget.resultado.quantidadeDePeriodos ? budget.resultado.entrada.totalDeTernos / budget.resultado.quantidadeDePeriodos : 0))}</strong></div>
     <div><span>Total de ternos</span><strong>${number(budget.resultado.entrada.totalDeTernos)}</strong></div>
     <div><span>Custo total</span><strong>${money(budget.resultado.custoTotal)}</strong></div>
   </div></section>
-  <section class="print-report-section"><h2>Composição por período</h2><div class="saved-period-table-wrap"><table class="saved-period-table"><thead><tr><th>Data</th><th>Período</th><th>Produção</th><th>Ternos</th><th>Majoração</th><th>Custo</th></tr></thead><tbody>
-    ${budget.resultado.periodos.map((periodo) => `<tr><td>${formatarDataPtBr(periodo.periodo.data)}</td><td>${escapeHtml(periodo.periodo.identificador)}</td><td>${number(periodo.producaoToneladas)} ${unidade.abreviacao}</td><td>${number(periodo.ternos)}</td><td>${escapeHtml(periodo.custo.majoracao?.descricao ?? 'preço normal')}</td><td>${money(periodo.custo.total)}</td></tr>`).join('')}
+  <section class="print-report-section"><h2>Composição por período</h2><div class="saved-period-table-wrap"><table class="saved-period-table"><thead><tr><th>Data</th><th>Período</th><th>Produtividade / terno</th><th>Produção</th><th>Ternos</th><th>Majoração</th><th>Custo</th></tr></thead><tbody>
+    ${budget.resultado.periodos.map((periodo, indice) => `<tr><td>${formatarDataPtBr(periodo.periodo.data)}</td><td>${escapeHtml(periodo.periodo.identificador)}</td><td>${number(budget.resultado.entrada.produtividadesPorPeriodo?.[indice] ?? budget.resultado.entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/terno</td><td>${number(periodo.producaoToneladas)} ${unidade.abreviacao}</td><td>${number(periodo.ternos)}</td><td>${escapeHtml(periodo.custo.majoracao?.descricao ?? 'preço normal')}</td><td>${money(periodo.custo.total)}</td></tr>`).join('')}
   </tbody></table></div></section>
-  <section class="print-report-section"><h2>Sensibilidade à produtividade</h2><p class="print-report-note">Comparação do custo por ${escapeHtml(unidade.singular)} em cenários automáticos de produtividade${pontoOtimo ? ` · ótimo calculado em ${number(pontoOtimo.produtividade)} ${unidade.abreviacao}/período, com ${number(pontoOtimo.periodos)} períodos` : ''}.</p><div class="print-memory">${sensibilidade.map((ponto) => `<div><span>${number(ponto.produtividade)} ${unidade.abreviacao}/período · ${number(ponto.periodos)} períodos${ponto.produtividade === produtividadeBase ? ' · base' : ''}${pontoOtimo && ponto.produtividade === pontoOtimo.produtividade ? ' · ótimo' : ''}</span><strong>${money(ponto.custoPorTonelada)}</strong></div>`).join('')}</div></section>
+  <section class="print-report-section"><h2>Sensibilidade à produtividade</h2><p class="print-report-note">Comparação do custo por ${escapeHtml(unidade.singular)} em cenários automáticos de produtividade por terno e por período${pontoOtimo ? ` · ótimo calculado em ${number(pontoOtimo.produtividade)} ${unidade.abreviacao}/terno/período, com ${number(pontoOtimo.periodos)} períodos` : ''}.</p><div class="print-memory">${sensibilidade.map((ponto) => `<div><span>${number(ponto.produtividade)} ${unidade.abreviacao}/terno/período · ${number(ponto.periodos)} períodos${ponto.produtividade === produtividadeBase ? ' · base' : ''}${pontoOtimo && ponto.produtividade === pontoOtimo.produtividade ? ' · ótimo' : ''}</span><strong>${money(ponto.custoPorTonelada)}</strong></div>`).join('')}</div></section>
   <section class="print-report-section"><h2>Memória por período</h2><div class="print-period-memory">
     ${budget.resultado.periodos.map((periodo) => `<div class="print-period-memory-block"><h3>${formatarDataPtBr(periodo.periodo.data)} · ${escapeHtml(periodo.periodo.identificador)} · ${money(periodo.custo.total)}</h3>${periodo.custo.memoria.map((linha) => `<div><span>${escapeHtml(linha.descricao)}</span><strong>${money(linha.valor)}</strong></div>`).join('')}</div>`).join('')}
   </div></section>
@@ -699,9 +708,9 @@ function applyPeriodDetails(): void {
     showDistributionError('Cada produtividade por período deve ser maior que zero.');
     return;
   }
-  const totalProdutividade = produtividades.reduce((sum, value) => sum + value, 0);
-  if (!quaseIgual(totalProdutividade, volume)) {
-    showDistributionError(`O volume distribuído é ${number(totalProdutividade)}; ele precisa ser exatamente ${number(volume)}.`);
+  const totalVolumeDistribuido = volumeDistribuidoPorPeriodos(produtividades, ternos);
+  if (!quaseIgual(totalVolumeDistribuido, volume)) {
+    showDistributionError(`O volume distribuído é ${number(totalVolumeDistribuido)}; ele precisa ser exatamente ${number(volume)}.`);
     return;
   }
   ternosEditorStatus.hidden = true;
@@ -730,9 +739,11 @@ function renderTernosEditor(resultado?: ResultadoDeSimulacao): void {
   if (
     draftProductivities.length !== periodos.length
     || draftProductivities.some((produtividade) => !Number.isFinite(produtividade) || produtividade <= 0)
-    || !quaseIgual(draftProductivities.reduce((soma, produtividade) => soma + produtividade, 0), volume)
+    || !quaseIgual(volumeDistribuidoPorPeriodos(draftProductivities, draftDistribution), volume)
   ) {
-    draftProductivities = distribuirProdutividadeLocal(volume, periodos.length);
+    draftProductivities = periodos.length && produtividadeBase > 0 && Number.isFinite(totalTernos)
+      ? Array.from({ length: periodos.length }, () => produtividadeBase)
+      : [];
   }
 
   const totalTernosLabel = Number.isFinite(totalTernos)
@@ -764,7 +775,7 @@ function renderTernosEditor(resultado?: ResultadoDeSimulacao): void {
         <td>
           <label class="period-productivity-control">
             <input class="productivity-period-input" data-period-index="${periodo.indice}" type="number" min="0.01" step="0.01" value="${produtividade}" aria-label="Produtividade no ${periodo.identificador}" />
-            <span>${unidade.abreviacao} / período</span>
+            <span>${unidade.abreviacao} / terno / período</span>
           </label>
         </td>
         <td>
@@ -804,8 +815,9 @@ function updateTernosPreview(): void {
 function projetarPeriodosDoFormulario(): readonly PeriodoOgmo[] {
   const volume = Number(volumeInput.value);
   const produtividade = Number(productivityInput.value);
-  if (volume <= 0 || produtividade <= 0) return [];
-  const quantidade = Math.ceil(volume / produtividade);
+  const ternosPorPeriodo = Number(ternosPorPeriodoInput.value);
+  if (volume <= 0 || produtividade <= 0 || !Number.isInteger(ternosPorPeriodo) || ternosPorPeriodo < 1 || ternosPorPeriodo > 4) return [];
+  const quantidade = Math.ceil(volume / (produtividade * ternosPorPeriodo));
   const [ano, mes, dia] = dateInput.value.split('-').map(Number);
   if (!ano || !mes || !dia) return [];
   try {
@@ -822,15 +834,6 @@ function distribuirTernosLocal(total: number, periodos: number): readonly number
   return Array.from({ length: periodos }, (_, indice) => base + (indice >= periodos - sobras ? 1 : 0));
 }
 
-function distribuirProdutividadeLocal(total: number, periodos: number): readonly number[] {
-  if (periodos <= 0 || !Number.isFinite(total) || total <= 0) return [];
-  if (periodos === 1) return [total];
-  const base = Math.round((total / periodos) * 100) / 100;
-  const distribuicao = Array.from({ length: periodos }, () => base);
-  distribuicao[periodos - 1] = Math.round((total - base * (periodos - 1)) * 100) / 100;
-  return distribuicao;
-}
-
 function quaseIgual(a: number, b: number): boolean {
   return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= 0.0001;
 }
@@ -841,7 +844,7 @@ function renderDistributionTotals(
   abreviacao?: string,
 ): void {
   const volume = numberOf('#volume');
-  const totalVolume = produtividades.reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
+  const totalVolume = volumeDistribuidoPorPeriodos(produtividades, ternos);
   const totalTernos = ternos.reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
   const totalTernosEsperado = totalTernosCalculado();
   const unidade = abreviacao ?? unidadeDaFaina(catalogoPortmac.obterFaina(fainaCodeInput.value)?.unidade).abreviacao;
@@ -851,6 +854,24 @@ function renderDistributionTotals(
   ternosEditorTernosTarget.textContent = Number.isFinite(totalTernosEsperado) ? number(totalTernosEsperado) : '—';
   ternosEditorVolumeTotal.parentElement?.classList.toggle('is-valid', quaseIgual(totalVolume, volume));
   ternosEditorTernosTotal.parentElement?.classList.toggle('is-valid', totalTernos === totalTernosEsperado);
+}
+
+function volumeDistribuidoPorPeriodos(
+  produtividades: readonly number[],
+  ternos: readonly number[],
+): number {
+  let restante = numberOf('#volume');
+  let total = 0;
+  produtividades.forEach((produtividade, indice) => {
+    if (!Number.isFinite(produtividade) || produtividade <= 0) return;
+    const quantidadeDeTernos = ternos[indice] ?? Number.NaN;
+    if (!Number.isFinite(quantidadeDeTernos) || quantidadeDeTernos < 0) return;
+    const capacidade = produtividade * quantidadeDeTernos;
+    const producao = Math.min(capacidade, Math.max(0, restante));
+    total += producao;
+    restante -= producao;
+  });
+  return total;
 }
 
 function renderFainaOptions(): void {
@@ -1023,12 +1044,20 @@ function renderCalculationMemory(resultado: ResultadoDeSimulacao): void {
       <strong>${indice < 4 ? number(linha.valor) : money(linha.valor)}</strong>
     </div>
   `).join('');
-  const periods = resultado.periodos.map((periodo) => `
+  const periods = resultado.periodos.map((periodo, indice) => `
     <details class="memory-period">
-      <summary>${formatarDataPtBr(periodo.periodo.data)} · ${escapeHtml(periodo.periodo.identificador)} · produtividade ${number(periodo.producaoToneladas)} ${unidade.abreviacao} · ${money(periodo.custo.total)}</summary>
+      <summary>${formatarDataPtBr(periodo.periodo.data)} · ${escapeHtml(periodo.periodo.identificador)} · produção ${number(periodo.producaoToneladas)} ${unidade.abreviacao} · ${money(periodo.custo.total)}</summary>
       <div class="memory-period-lines">
         <div class="memory-line">
-          <span>Produtividade do período</span>
+          <span>Produtividade por terno</span>
+          <strong>${number(resultado.entrada.produtividadesPorPeriodo?.[indice] ?? resultado.entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/terno/período</strong>
+        </div>
+        <div class="memory-line">
+          <span>Ternos alocados</span>
+          <strong>${number(periodo.ternos)}</strong>
+        </div>
+        <div class="memory-line">
+          <span>Produção movimentada no período</span>
           <strong>${number(periodo.producaoToneladas)} ${unidade.abreviacao}</strong>
         </div>
         ${periodo.custo.memoria.map((linha) => `
@@ -1075,9 +1104,16 @@ function showDistributionError(message: string): void {
 function updateCalculatedPeriods(): void {
   const volume = Number(volumeInput.value);
   const productivity = Number(productivityInput.value);
-  const periods = volume > 0 && productivity > 0 ? Math.ceil(volume / productivity) : undefined;
+  const ternosPorPeriodo = Number(ternosPorPeriodoInput.value);
+  const periods = volume > 0
+    && productivity > 0
+    && Number.isInteger(ternosPorPeriodo)
+    && ternosPorPeriodo >= 1
+    && ternosPorPeriodo <= 4
+    ? Math.ceil(volume / (productivity * ternosPorPeriodo))
+    : undefined;
   setText('#calculated-periods', periods === undefined ? '—' : String(periods));
-  const totalTernos = periods === undefined ? Number.NaN : periods * Number(ternosPorPeriodoInput.value);
+  const totalTernos = periods === undefined ? Number.NaN : periods * ternosPorPeriodo;
   setText('#total-ternos', Number.isInteger(totalTernos) && totalTernos > 0 ? number(totalTernos) : '—');
 }
 
@@ -1088,7 +1124,8 @@ function totalTernosCalculado(): number {
   if (volume <= 0 || produtividade <= 0 || !Number.isInteger(ternosPorPeriodo) || ternosPorPeriodo < 1 || ternosPorPeriodo > 4) {
     return Number.NaN;
   }
-  return Math.ceil(volume / produtividade) * ternosPorPeriodo;
+  const quantidadeDePeriodos = Math.ceil(volume / (produtividade * ternosPorPeriodo));
+  return quantidadeDePeriodos * ternosPorPeriodo;
 }
 
 function valueOf<T extends HTMLInputElement | HTMLSelectElement>(selector: string): string {

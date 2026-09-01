@@ -126,10 +126,11 @@ function calcularCustoComposicaoProvisoria(
   const memoria = itens.map((item) => {
     const fatorDaEquipe = regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 1 : item.cotas;
     const custoBase = fatorDaEquipe * regra.taxaBase * quantidadeBase;
-    const custoTotal = custoBase * fatorEncargos * majoracao.fator * contexto.ternos;
+    const multiplicaPorTernos = regra.regime === 'SALARIO_DIA' ? contexto.ternos : 1;
+    const custoTotal = custoBase * fatorEncargos * majoracao.fator * multiplicaPorTernos;
     const unidade = regra.regime === 'PRODUCAO' ? 'produção do período' : 'salário-dia';
     return {
-      descricao: `${item.categoria} · ${item.homens} homens · ${regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 'tarifa unitária' : `${item.cotas} cotas agregadas`} × ${regra.taxaBase.toFixed(4)} · ${unidade} · ${descricaoDoAdicional(majoracao.adicionalPercentual)} · ${contexto.ternos} terno(s)`,
+      descricao: `${item.categoria} · ${item.homens} homens · ${regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 'tarifa unitária' : `${item.cotas} cotas agregadas`} × ${regra.taxaBase.toFixed(4)} · ${unidade} · ${descricaoDoAdicional(majoracao.adicionalPercentual)}${regra.regime === 'SALARIO_DIA' ? ` · ${contexto.ternos} terno(s)` : ' · produção agregada dos ternos'}`,
       valor: custoTotal,
     };
   });
