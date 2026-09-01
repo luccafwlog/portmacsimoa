@@ -22,6 +22,7 @@ export interface CustoOpcional {
 }
 
 export type RegimeRemuneratorio = 'PRODUCAO' | 'SALARIO_DIA';
+export type BaseDeCalculoProvisoria = 'COTAS_DA_EQUIPE' | 'TARIFA_UNITARIA';
 
 export interface ComposicaoCctProvisoria {
   readonly categoria: string;
@@ -32,6 +33,7 @@ export interface ComposicaoCctProvisoria {
 
 export interface RegraDeComposicaoProvisoria {
   readonly taxaBase: number;
+  readonly baseDeCalculo: BaseDeCalculoProvisoria;
   readonly regime: RegimeRemuneratorio;
   readonly unidade: UnidadeDeMedida;
   /** Valor usado pela planilha como adicional de encargos/contribuições. */
@@ -55,7 +57,11 @@ export interface EntradaDeSimulacao {
   readonly inicio: InicioDaOperacao;
   readonly volumeToneladas: number;
   readonly produtividadeToneladasPorPeriodo: number;
+  /** Quantidade padrão de ternos em cada período; o total é derivado. */
+  readonly ternosPorPeriodoPadrao?: number;
   readonly totalDeTernos: number;
+  /** Opcional: capacidade customizada de cada período projetado. */
+  readonly produtividadesPorPeriodo?: readonly number[];
   /** Custos totais informados pelo usuário, opcionais à mão de obra. */
   readonly custosOpcionais?: readonly CustoOpcional[];
   /** Opcional: cenário manual que preserva o total de ternos informado. */

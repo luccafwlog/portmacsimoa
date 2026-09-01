@@ -61,12 +61,13 @@
 
                   <label class="field">
                     <span>Data de início</span>
-                    <input id="data" type="date" value="2026-09-04" required />
+                    <input id="data" type="date" required />
                   </label>
 
                   <label class="field">
                     <span>Período de início</span>
                     <select id="periodo" required>
+                      <option value="" selected disabled>Selecione o período</option>
                       <option value="01-07">01-07 · primeiro período</option>
                       <option value="07-13">07-13 · segundo período</option>
                       <option value="13-19">13-19 · terceiro período</option>
@@ -78,24 +79,29 @@
                 <div class="operation-row operation-row-metrics">
                   <label class="field">
                     <span id="volume-field-label">Volume do navio <b>ton</b></span>
-                    <input id="volume" type="number" min="0.01" step="0.01" value="105" required />
+                    <input id="volume" type="number" min="0.01" step="0.01" placeholder="Informe a quantidade" required />
                   </label>
                   <label class="field">
                     <span id="productivity-field-label">Produtividade <b>ton / período</b></span>
-                    <input id="produtividade" type="number" min="0.01" step="0.01" value="10" required />
+                    <input id="produtividade" type="number" min="0.01" step="0.01" placeholder="Informe a capacidade" required />
                   </label>
                   <div class="period-preview" aria-live="polite">
                     <div>
                       <span class="preview-label">TOTAL DE PERÍODOS CALCULADOS</span>
                       <small>volume ÷ produtividade, arredondado para cima</small>
                     </div>
-                    <strong id="calculated-periods">11</strong>
+                    <strong id="calculated-periods">—</strong>
                   </div>
                   <label class="field">
-                    <span>Total de ternos</span>
-                    <input id="total-ternos" type="number" min="1" step="1" value="22" required />
-                    <small>distribuição equilibrada automática; você pode ajustar depois</small>
+                    <span>Ternos por período <b>1 a 4</b></span>
+                    <input id="ternos-por-periodo" type="number" min="1" max="4" step="1" placeholder="Informe a quantidade" required />
+                    <small>o total será calculado conforme os períodos</small>
                   </label>
+                  <div class="field calculated-field">
+                    <span>Total de ternos calculado</span>
+                    <output id="total-ternos">—</output>
+                    <small>períodos calculados × ternos por período</small>
+                  </div>
                 </div>
 
               </div>
@@ -159,31 +165,44 @@
                 <button id="add-custom-cost" class="secondary-button" type="button">Adicionar custo</button>
               </section>
 
-              <section class="ternos-editor" aria-labelledby="ternos-editor-title">
-                <div class="ternos-editor-heading">
+              <details id="ternos-editor" class="ternos-editor">
+                <summary class="ternos-editor-heading">
                   <div>
                     <span class="section-index">02</span>
-                    <h2 id="ternos-editor-title">Detalhamento por ternos</h2>
+                    <h2 id="ternos-editor-title">Detalhamento por períodos</h2>
                   </div>
-                  <span id="ternos-editor-count" class="sum-badge">11 períodos</span>
+                  <div class="ternos-editor-summary">
+                    <span id="ternos-editor-count" class="sum-badge">11 períodos</span>
+                    <span class="editor-expand-hint" aria-hidden="true">abrir</span>
+                  </div>
+                </summary>
+                <div class="ternos-editor-content">
+                  <p class="panel-caption">Ajuste a produtividade e a quantidade de ternos de cada período. Os totais distribuídos precisam ser exatamente iguais aos valores da operação.</p>
+                  <div class="distribution-totals" aria-live="polite">
+                    <div class="distribution-total">
+                      <span>Volume distribuído</span>
+                      <strong id="ternos-editor-volume-total">—</strong>
+                      <small>de <b id="ternos-editor-volume-target">—</b> do navio</small>
+                    </div>
+                    <div class="distribution-total">
+                      <span>Ternos distribuídos</span>
+                      <strong id="ternos-editor-ternos-total">—</strong>
+                      <small>de <b id="ternos-editor-ternos-target">—</b> informados</small>
+                    </div>
+                  </div>
+                  <div id="ternos-editor-status" class="distribution-status" hidden></div>
+                  <div class="table-wrap ternos-editor-table-wrap">
+                    <table>
+                      <thead>
+                        <tr><th>Período</th><th>Data de início</th><th>Produtividade</th><th>Ternos</th><th>Remuneração</th><th>Mão de obra</th></tr>
+                      </thead>
+                      <tbody id="ternos-editor-body"></tbody>
+                    </table>
+                  </div>
                 </div>
-                <p class="panel-caption">Defina a quantidade de ternos por período antes de calcular. A soma precisa permanecer igual ao total informado.</p>
-                <div id="ternos-editor-status" class="distribution-status" hidden></div>
-                <div class="table-wrap ternos-editor-table-wrap">
-                  <table>
-                    <thead>
-                      <tr><th>Período</th><th>Data de início</th><th>Produção</th><th>Ternos</th><th>Remuneração</th><th>Mão de obra</th></tr>
-                    </thead>
-                    <tbody id="ternos-editor-body"></tbody>
-                  </table>
-                </div>
-              </section>
+              </details>
 
-              <div class="form-note">
-                <span class="note-mark">i</span>
-                <p>A produtividade é a produção total esperada da operação por período. O simulador não a multiplica pelos ternos.</p>
-              </div>
-
+              <div class="form-section-divider" aria-hidden="true"></div>
               <button class="primary-button" type="submit">
                 <span>Calcular cenário</span>
                 <span class="button-arrow" aria-hidden="true">↗</span>
@@ -192,10 +211,6 @@
           </section>
 
           <section class="results-column" aria-live="polite">
-            <div id="catalog-status-banner" class="catalog-banner">
-              <span class="catalog-icon">⌁</span>
-              <span><strong>Catálogo documental provisório</strong> · ACT inicial, ACT da planilha e CCT da planilha habilitados para simulação preliminar; documentos oficiais ainda pendentes.</span>
-            </div>
             <div id="error" class="error-message" role="alert" hidden></div>
 
             <section id="empty-state" class="panel empty-state">
@@ -218,7 +233,7 @@
                 <div class="metric metric-primary">
                   <span id="cost-per-unit-label">Custo por tonelada</span>
                   <strong id="cost-per-ton">R$ 0,00</strong>
-                  <small>número de referência</small>
+                  <small>referência da cotação</small>
                 </div>
                 <div class="metric">
                   <span>Custo total</span>
@@ -271,6 +286,40 @@
                 </div>
                 <div id="calculation-memory-lines" class="calculation-memory-lines"></div>
               </section>
+
+              <section class="panel period-cost-chart" aria-labelledby="period-cost-chart-title">
+                <div class="panel-heading cost-breakdown-heading">
+                  <div>
+                    <span class="section-index">05</span>
+                    <h2 id="period-cost-chart-title">Custo por período</h2>
+                  </div>
+                  <span id="period-cost-chart-summary" class="sum-badge"></span>
+                </div>
+                <div id="period-cost-chart-body" class="period-cost-chart-body"></div>
+              </section>
+
+              <section class="panel productivity-sensitivity" aria-labelledby="productivity-sensitivity-title">
+                <div class="panel-heading cost-breakdown-heading">
+                  <div>
+                    <span class="section-index">06</span>
+                    <h2 id="productivity-sensitivity-title">Sensibilidade à produtividade</h2>
+                  </div>
+                  <span id="productivity-sensitivity-summary" class="sum-badge">cenários comparativos</span>
+                </div>
+                <p class="panel-caption sensitivity-caption">O simulador compara uma grade independente de produtividades, recalcula os períodos e aponta o menor custo por unidade. A faixa de produtividade é provisória, baseada na série “Gráficos” da planilha legada; o custo de cada cenário é recalculado pelo motor oficial.</p>
+                <div id="productivity-sensitivity-body" class="productivity-sensitivity-body"></div>
+              </section>
+
+              <section class="save-budget-panel" aria-labelledby="save-budget-title">
+                <div>
+                  <span class="section-index">07</span>
+                  <div>
+                    <h2 id="save-budget-title">Salvar orçamento</h2>
+                    <p id="save-budget-hint">Informe o cliente nos dados da operação para salvar</p>
+                  </div>
+                </div>
+                <button id="save-budget" class="secondary-button" type="button" disabled>Salvar orçamento</button>
+              </section>
             </section>
           </section>
         </div>
@@ -284,21 +333,22 @@
       <main id="page-clientes" class="page secondary-page" data-page="clientes" hidden>
         <section class="hero secondary-hero">
           <div class="eyebrow">RELACIONAMENTO <span>·</span> HISTÓRICO</div>
-          <h1>Clientes <em>cadastrados</em></h1>
+          <h1>Clientes</h1>
           <p>Consulte as simulações e os orçamentos realizados para cada cliente em um só lugar.</p>
         </section>
 
         <section class="panel page-card">
           <div class="panel-heading">
             <div><span class="section-index">01</span><h2>Registro de clientes e cotações</h2></div>
-            <span class="required-note">em breve</span>
+            <span class="required-note">histórico</span>
           </div>
-          <div class="page-empty-state">
+          <div id="clients-empty" class="page-empty-state">
             <div class="empty-mark">⌁</div>
             <h2>O histórico começa aqui</h2>
-            <p>Esta página será o ponto de consulta das simulações e orçamentos vinculados a cada cliente. A nova simulação continua disponível para criar o próximo cenário.</p>
+            <p>Esta página é o ponto de consulta das simulações e orçamentos vinculados a cada cliente. Crie uma nova simulação para registrar o próximo cenário.</p>
             <a class="secondary-button page-action" href="#/nova-simulacao">Criar nova simulação <span>↗</span></a>
           </div>
+          <div id="client-budget-list" class="saved-budget-list" hidden></div>
         </section>
       </main>
 
@@ -331,11 +381,12 @@
               <button class="catalog-filter" type="button" data-catalog-source="CCT" aria-pressed="false">CCT</button>
             </div>
             <span id="catalog-visible-count" class="catalog-visible-count" aria-live="polite"></span>
+            <span class="catalog-legend">ACT/CCT · provisória</span>
           </div>
           <div class="table-wrap catalog-table-wrap">
             <table class="catalog-table">
               <thead>
-                <tr><th>Faina / tipo de carga</th><th>Grupo / vigência</th><th>Fonte / estado</th><th>Unidade</th><th>Regra de custo</th><th>Referência</th></tr>
+                <tr><th>Faina / tipo de carga</th><th>Grupo / vigência</th><th>Fonte / estado</th><th>Unidade</th><th>Regra de custo</th></tr>
               </thead>
               <tbody id="catalog-table-body"></tbody>
             </table>

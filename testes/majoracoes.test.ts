@@ -6,12 +6,19 @@ import { CatalogoPortmac } from '../src/catalogo/portmac.js';
 import { fainasActProvisorias } from '../src/catalogo/act-provisorio.js';
 import { fainasCctProvisorias } from '../src/catalogo/cct-provisorio.js';
 import { simular } from '../src/motor/simulador.js';
-import { ehFeriadoNacional } from '../src/calendario/feriados.js';
+import { ehFeriadoNacional, ehFeriadoVilaVelha } from '../src/calendario/feriados.js';
 
 describe('majorações por período', () => {
   it('reconhece 7 de setembro como feriado nacional sem cadastro manual', () => {
     expect(ehFeriadoNacional(data(2026, 9, 7))).toBe(true);
     expect(ehFeriadoNacional(data(2026, 9, 8))).toBe(false);
+  });
+
+  it('aplica em 2026 os feriados municipais de Vila Velha da referência de 2025', () => {
+    expect(ehFeriadoVilaVelha(data(2026, 4, 28))).toBe(true);
+    expect(ehFeriadoVilaVelha(data(2026, 5, 23))).toBe(true);
+    expect(ehFeriadoVilaVelha(data(2026, 6, 19))).toBe(true);
+    expect(ehFeriadoVilaVelha(data(2026, 6, 20))).toBe(false);
   });
 
   it('mantém a remuneração normal durante o sábado diurno', () => {
@@ -115,10 +122,10 @@ describe('majorações por período', () => {
       calendarioOperacional,
     );
 
-    const esperado = 100 * 1.0265 * 19.4 * (1 + 1.152877);
+    const esperado = 100 * 1.0265 * (1 + 1.152877);
     expect(resultado.periodos[0]?.custo.total).toBeCloseTo(esperado, 6);
-    expect(resultado.periodos[0]?.custo.memoria).toHaveLength(6);
-    expect(resultado.periodos[0]?.custo.memoria[0]?.descricao).toContain('Conferentes');
-    expect(resultado.periodos[0]?.custo.memoria[4]?.descricao).toContain('Vigias');
+    expect(resultado.periodos[0]?.custo.memoria).toHaveLength(2);
+    expect(resultado.periodos[0]?.custo.memoria[0]?.descricao).toContain('tarifa unitária');
+    expect(resultado.periodos[0]?.custo.memoria[1]?.descricao).toContain('CCT provisória');
   });
 });

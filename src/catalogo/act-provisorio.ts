@@ -65,6 +65,7 @@ export const fainasActProvisorias: readonly RegistroDeFaina[] = DEFINICOES.map((
   referencia: `Mapeamento provisório · Analise_ACT_PORTMAC_Calculadora_Terno_Portuario.xlsx · ${definicao.codigo} · ${definicao.observacao}`,
   regraActProvisoria: {
     taxaBase: definicao.taxaBase,
+    baseDeCalculo: 'COTAS_DA_EQUIPE',
     regime: definicao.regime,
     unidade: definicao.unidade,
     encargosContribuicaoAdicional: ENCARGOS_E_CONTRIBUICOES,

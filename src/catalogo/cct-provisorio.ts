@@ -94,6 +94,7 @@ export const fainasCctProvisorias: readonly RegistroDeFaina[] = DEFINICOES.map((
   referencia: `Mapeamento provisório · Analise_CCT_Calculadora_Terno_Portuario (1).xlsx · ${definicao.codigo} · ${definicao.observacao}`,
   regraCctProvisoria: {
     taxaBase: definicao.taxaBase,
+    baseDeCalculo: definicao.regime === 'PRODUCAO' ? 'TARIFA_UNITARIA' : 'COTAS_DA_EQUIPE',
     regime: definicao.regime,
     unidade: definicao.unidade,
     encargosContribuicaoAdicional: ENCARGOS_E_CONTRIBUICOES,

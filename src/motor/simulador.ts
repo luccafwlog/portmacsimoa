@@ -7,7 +7,7 @@ import type {
   ResultadoDeSimulacao,
 } from '../dominio/tipos.js';
 import { obterMajoracaoDoPeriodo } from '../dominio/majoracoes.js';
-import { ehFeriadoNacional } from '../calendario/feriados.js';
+import { ehFeriadoVilaVelha } from '../calendario/feriados.js';
 
 export class EntradaInvalida extends Error {
   constructor(mensagem: string) {
@@ -42,6 +42,14 @@ export function simular(
   const quantidadeDePeriodos = Math.ceil(
     entrada.volumeToneladas / entrada.produtividadeToneladasPorPeriodo,
   );
+  if (entrada.ternosPorPeriodoPadrao !== undefined) {
+    if (!Number.isInteger(entrada.ternosPorPeriodoPadrao) || entrada.ternosPorPeriodoPadrao < 1 || entrada.ternosPorPeriodoPadrao > 4) {
+      throw new EntradaInvalida('Os ternos por período devem ser um inteiro entre 1 e 4.');
+    }
+    if (entrada.totalDeTernos !== entrada.ternosPorPeriodoPadrao * quantidadeDePeriodos) {
+      throw new EntradaInvalida('O total de ternos deve ser igual aos períodos multiplicados pelos ternos por período.');
+    }
+  }
   if (entrada.totalDeTernos > quantidadeDePeriodos * 4) {
     throw new EntradaInvalida(
       'O total de ternos excede o máximo de 4 ternos por período.',
@@ -50,6 +58,9 @@ export function simular(
   const distribuicaoDeTernos = entrada.ternosPorPeriodo
     ? validarDistribuicao(entrada.ternosPorPeriodo, quantidadeDePeriodos, entrada.totalDeTernos)
     : distribuirTernos(entrada.totalDeTernos, quantidadeDePeriodos);
+  const produtividadesPorPeriodo = entrada.produtividadesPorPeriodo
+    ? validarProdutividades(entrada.produtividadesPorPeriodo, quantidadeDePeriodos, entrada.volumeToneladas)
+    : Array.from({ length: quantidadeDePeriodos }, () => entrada.produtividadeToneladasPorPeriodo);
   const periodos = calendario.projetar(entrada.inicio, quantidadeDePeriodos);
   if (periodos.length !== quantidadeDePeriodos) {
     throw new CatalogoIncompleto(
@@ -60,11 +71,11 @@ export function simular(
   let restante = entrada.volumeToneladas;
   const calculados = periodos.map((periodo, indice) => {
     const producaoToneladas = Math.min(
-      entrada.produtividadeToneladasPorPeriodo,
+      produtividadesPorPeriodo[indice]!,
       restante,
     );
     restante -= producaoToneladas;
-    const feriado = ehFeriadoNacional(periodo.data);
+    const feriado = ehFeriadoVilaVelha(periodo.data);
     const majoracao = ['01-07', '07-13', '13-19', '19-01'].includes(periodo.identificador)
       ? obterMajoracaoDoPeriodo({
         data: periodo.data,
@@ -172,4 +183,22 @@ function validarDistribuicao(
     throw new EntradaInvalida('A redistribuição deve preservar o total de ternos.');
   }
   return distribuicao;
+}
+
+function validarProdutividades(
+  produtividades: readonly number[],
+  periodos: number,
+  volume: number,
+): readonly number[] {
+  if (produtividades.length !== periodos) {
+    throw new EntradaInvalida('A produtividade precisa ter um valor por período.');
+  }
+  if (produtividades.some((produtividade) => !Number.isFinite(produtividade) || produtividade <= 0)) {
+    throw new EntradaInvalida('Cada produtividade por período deve ser maior que zero.');
+  }
+  const total = produtividades.reduce((soma, produtividade) => soma + produtividade, 0);
+  if (Math.abs(total - volume) > 0.0001) {
+    throw new EntradaInvalida('A soma das produtividades por período deve ser exatamente igual ao volume da operação.');
+  }
+  return produtividades;
 }
