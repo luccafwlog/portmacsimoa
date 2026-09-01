@@ -19,7 +19,7 @@
         </nav>
         <div class="topbar-meta">
           <span class="status-dot" aria-hidden="true"></span>
-          <span>ambiente interno</span>
+          <span>ambiente interno · ACT/CCT provisórias</span>
         </div>
       </header>
 
@@ -41,58 +41,64 @@
             </div>
 
             <form id="simulation-form">
-              <label class="field field-wide">
-                <span>Faina / tipo de carga</span>
-                <select id="faina" required></select>
-                <small>selecionada no catálogo documental vigente</small>
-              </label>
+              <div class="operation-fields">
+                <div class="operation-row operation-row-primary">
+                  <label class="field">
+                    <span>Faina / tipo de carga</span>
+                    <div class="combobox">
+                      <input id="faina" type="text" role="combobox" aria-autocomplete="list" aria-controls="faina-options" aria-expanded="false" autocomplete="off" placeholder="Buscar faina ou código" required />
+                      <input id="faina-code" type="hidden" required />
+                      <div id="faina-options" class="combobox-options" role="listbox" hidden></div>
+                    </div>
+                    <small>digite para buscar e selecione uma opção do catálogo</small>
+                  </label>
 
-              <label class="field field-wide">
-                <span>Cliente da cotação <b>opcional</b></span>
-                <input id="cliente" type="text" maxlength="120" autocomplete="organization" placeholder="Nome do cliente" />
-                <small>identifica o cenário; não altera o cálculo</small>
-              </label>
+                  <label class="field">
+                    <span>Cliente da cotação <b>opcional</b></span>
+                    <input id="cliente" type="text" maxlength="120" autocomplete="organization" placeholder="Nome do cliente" />
+                    <small>identifica o cenário; não altera o cálculo</small>
+                  </label>
 
-              <div class="field-row">
-                <label class="field">
-                  <span>Data de início</span>
-                  <input id="data" type="date" value="2026-09-04" required />
-                </label>
-                <label class="field">
-                  <span>Período de início</span>
-                  <select id="periodo" required>
-                    <option value="01-07">01-07 · primeiro período</option>
-                    <option value="07-13">07-13 · segundo período</option>
-                    <option value="13-19">13-19 · terceiro período</option>
-                    <option value="19-01">19-01 · quarto período</option>
-                  </select>
-                </label>
-              </div>
+                  <label class="field">
+                    <span>Data de início</span>
+                    <input id="data" type="date" value="2026-09-04" required />
+                  </label>
 
-              <div class="field-row">
-                <label class="field">
-                  <span>Volume do navio <b>ton</b></span>
-                  <input id="volume" type="number" min="0.01" step="0.01" value="105" required />
-                </label>
-                <label class="field">
-                  <span>Produtividade <b>ton / período</b></span>
-                  <input id="produtividade" type="number" min="0.01" step="0.01" value="10" required />
-                </label>
-              </div>
-
-              <div class="period-preview" aria-live="polite">
-                <div>
-                  <span class="preview-label">TOTAL DE PERÍODOS CALCULADOS</span>
-                  <small>volume ÷ produtividade, arredondado para cima</small>
+                  <label class="field">
+                    <span>Período de início</span>
+                    <select id="periodo" required>
+                      <option value="01-07">01-07 · primeiro período</option>
+                      <option value="07-13">07-13 · segundo período</option>
+                      <option value="13-19">13-19 · terceiro período</option>
+                      <option value="19-01">19-01 · quarto período</option>
+                    </select>
+                  </label>
                 </div>
-                <strong id="calculated-periods">11</strong>
-              </div>
 
-              <label class="field field-wide">
-                <span>Total de ternos</span>
-                <input id="total-ternos" type="number" min="1" step="1" value="22" required />
-                <small>distribuição equilibrada automática; você pode ajustar depois</small>
-              </label>
+                <div class="operation-row operation-row-metrics">
+                  <label class="field">
+                    <span id="volume-field-label">Volume do navio <b>ton</b></span>
+                    <input id="volume" type="number" min="0.01" step="0.01" value="105" required />
+                  </label>
+                  <label class="field">
+                    <span id="productivity-field-label">Produtividade <b>ton / período</b></span>
+                    <input id="produtividade" type="number" min="0.01" step="0.01" value="10" required />
+                  </label>
+                  <div class="period-preview" aria-live="polite">
+                    <div>
+                      <span class="preview-label">TOTAL DE PERÍODOS CALCULADOS</span>
+                      <small>volume ÷ produtividade, arredondado para cima</small>
+                    </div>
+                    <strong id="calculated-periods">11</strong>
+                  </div>
+                  <label class="field">
+                    <span>Total de ternos</span>
+                    <input id="total-ternos" type="number" min="1" step="1" value="22" required />
+                    <small>distribuição equilibrada automática; você pode ajustar depois</small>
+                  </label>
+                </div>
+
+              </div>
 
               <section class="optional-costs" aria-labelledby="optional-costs-title">
                 <div class="optional-costs-heading">
@@ -153,6 +159,26 @@
                 <button id="add-custom-cost" class="secondary-button" type="button">Adicionar custo</button>
               </section>
 
+              <section class="ternos-editor" aria-labelledby="ternos-editor-title">
+                <div class="ternos-editor-heading">
+                  <div>
+                    <span class="section-index">02</span>
+                    <h2 id="ternos-editor-title">Detalhamento por ternos</h2>
+                  </div>
+                  <span id="ternos-editor-count" class="sum-badge">11 períodos</span>
+                </div>
+                <p class="panel-caption">Defina a quantidade de ternos por período antes de calcular. A soma precisa permanecer igual ao total informado.</p>
+                <div id="ternos-editor-status" class="distribution-status" hidden></div>
+                <div class="table-wrap ternos-editor-table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>Período</th><th>Data de início</th><th>Produção</th><th>Ternos</th><th>Remuneração</th><th>Mão de obra</th></tr>
+                    </thead>
+                    <tbody id="ternos-editor-body"></tbody>
+                  </table>
+                </div>
+              </section>
+
               <div class="form-note">
                 <span class="note-mark">i</span>
                 <p>A produtividade é a produção total esperada da operação por período. O simulador não a multiplica pelos ternos.</p>
@@ -168,7 +194,7 @@
           <section class="results-column" aria-live="polite">
             <div id="catalog-status-banner" class="catalog-banner">
               <span class="catalog-icon">⌁</span>
-              <span><strong>Catálogo documental em expansão</strong> · ACT inicial habilitada para cálculo; fainas da CCT transcritas e aguardando validação das regras.</span>
+              <span><strong>Catálogo documental provisório</strong> · ACT inicial, ACT da planilha e CCT da planilha habilitados para simulação preliminar; documentos oficiais ainda pendentes.</span>
             </div>
             <div id="error" class="error-message" role="alert" hidden></div>
 
@@ -190,7 +216,7 @@
 
               <div class="metrics-grid">
                 <div class="metric metric-primary">
-                  <span>Custo por tonelada</span>
+                  <span id="cost-per-unit-label">Custo por tonelada</span>
                   <strong id="cost-per-ton">R$ 0,00</strong>
                   <small>número de referência</small>
                 </div>
@@ -216,7 +242,7 @@
                 </div>
                 <div class="cost-lines">
                   <div class="cost-line">
-                    <div><span>Mão de obra</span><small id="labor-cost-per-ton">R$ 0,00 / ton</small></div>
+                    <div><span>Mão de obra</span><small id="labor-cost-per-unit">R$ 0,00 / ton</small></div>
                     <strong id="labor-cost-total">R$ 0,00</strong>
                   </div>
                   <div id="optional-cost-lines"></div>
@@ -227,31 +253,6 @@
                 </div>
               </section>
 
-              <details class="panel periods-panel">
-                <summary class="panel-heading periods-summary">
-                  <div>
-                    <span class="section-index">02</span>
-                    <h2>Detalhamento por ternos</h2>
-                  </div>
-                  <div class="periods-summary-meta">
-                    <span class="sum-badge">total: <strong id="ternos-total-label">0</strong> ternos</span>
-                    <span class="expand-hint" aria-hidden="true"><span class="expand-label"></span><span class="expand-icon">⌄</span></span>
-                  </div>
-                </summary>
-                <div class="periods-content">
-                  <p class="panel-caption">Ajuste os ternos por período para testar outro cenário. Use de 0 a 4 ternos; a soma precisa permanecer igual.</p>
-                  <div class="table-wrap">
-                    <table>
-                      <thead>
-                        <tr><th>Período</th><th>Data de início</th><th>Produção</th><th>Ternos</th><th>Mão de obra</th></tr>
-                      </thead>
-                      <tbody id="periods-body"></tbody>
-                    </table>
-                  </div>
-                  <div id="distribution-status" class="distribution-status" hidden></div>
-                </div>
-              </details>
-
               <section class="calculation-strip">
                 <div>
                   <span class="strip-label">MEMÓRIA DO CÁLCULO</span>
@@ -259,13 +260,24 @@
                 </div>
                 <span class="strip-arrow">→</span>
               </section>
+
+              <section class="panel calculation-memory" aria-labelledby="calculation-memory-title">
+                <div class="panel-heading cost-breakdown-heading">
+                  <div>
+                    <span class="section-index">04</span>
+                    <h2 id="calculation-memory-title">Memória detalhada</h2>
+                  </div>
+                  <span class="sum-badge">fórmula aplicada</span>
+                </div>
+                <div id="calculation-memory-lines" class="calculation-memory-lines"></div>
+              </section>
             </section>
           </section>
         </div>
 
         <footer class="footer-note">
           <span>PORTMAC · simulador de custo de operação</span>
-          <span><i></i> catálogo ACT inicial · CCT em ampliação</span>
+          <span><i></i> ACT/CCT provisórias em ampliação</span>
         </footer>
       </main>
 
@@ -307,6 +319,18 @@
           <div class="panel-heading">
             <div><span class="section-index">01</span><h2>Fainas e regras de cálculo</h2></div>
             <span class="required-note">ACT prioritária</span>
+          </div>
+          <div class="catalog-toolbar">
+            <label class="catalog-search">
+              <span>Buscar faina</span>
+              <input id="catalog-search" type="search" placeholder="Nome, código ou grupo" autocomplete="off" />
+            </label>
+            <div class="catalog-filters" role="group" aria-label="Filtrar por fonte documental">
+              <button class="catalog-filter active" type="button" data-catalog-source="TODAS" aria-pressed="true">Todas</button>
+              <button class="catalog-filter" type="button" data-catalog-source="ACT" aria-pressed="false">ACT</button>
+              <button class="catalog-filter" type="button" data-catalog-source="CCT" aria-pressed="false">CCT</button>
+            </div>
+            <span id="catalog-visible-count" class="catalog-visible-count" aria-live="polite"></span>
           </div>
           <div class="table-wrap catalog-table-wrap">
             <table class="catalog-table">
