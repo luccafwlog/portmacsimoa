@@ -2,8 +2,11 @@ import type {
   ContextoDeCustoDoPeriodo,
   CustoDoPeriodo,
   FainaCatalogada,
+  RegraDeComposicaoProvisoria,
 } from '../dominio/tipos.js';
 import type { CatalogoOgmo } from './portas.js';
+import { obterMajoracaoDoPeriodo } from '../dominio/majoracoes.js';
+import { fainasActProvisorias } from './act-provisorio.js';
 
 export interface RegraDeCustoPorTonelada {
   /** Taxa total da estiva por tonelada e por cota, sem homens extras. */
@@ -16,61 +19,11 @@ export interface RegraDeCustoPorTonelada {
 
 export interface RegistroDeFaina extends FainaCatalogada {
   readonly regra?: RegraDeCustoPorTonelada;
+  readonly regraCctProvisoria?: RegraDeComposicaoProvisoria;
+  readonly regraActProvisoria?: RegraDeComposicaoProvisoria;
 }
 
-/**
- * Registros transcritos da primeira fatia conferida da ACT 2026/2028.
- *
- * Os valores incluem encargos e contribuição social conforme a tabela da ACT.
- * Homens extras, peação, granéis, contêineres por unidade e adicionais por
- * jornada ficam fora desta primeira fatia até que suas regras sejam validadas.
- */
-export const fainasActIniciais: readonly RegistroDeFaina[] = [
-  {
-    codigo: 'GRANITO',
-    descricao: 'Granito',
-    tipoDeCarga: 'Granito',
-    unidade: 'TON',
-    fonte: 'ACT',
-    vigencia: '2026/2028',
-    referencia: 'Anexo I e Anexo II · faina 5.1',
-    regra: {
-      taxaEstivaPorTonelada: 0.99,
-      cotasEstivaPorTerno: 7.5,
-      taxaConferentesPorTonelada: 3.01,
-    },
-  },
-  {
-    codigo: 'PRODUTO_SIDERURGICO',
-    descricao: 'Produto siderúrgico',
-    tipoDeCarga: 'Produto siderúrgico, exceto tubos e trilhos',
-    unidade: 'TON',
-    fonte: 'ACT',
-    vigencia: '2026/2028',
-    referencia: 'Anexo I e Anexo II · faina 5.9',
-    regra: {
-      taxaEstivaPorTonelada: 0.98,
-      cotasEstivaPorTerno: 7.5,
-      taxaConferentesPorTonelada: 4,
-    },
-  },
-  {
-    codigo: 'TUBOS_E_TRILHOS',
-    descricao: 'Tubos e trilhos',
-    tipoDeCarga: 'Tubos e trilhos',
-    unidade: 'TON',
-    fonte: 'ACT',
-    vigencia: '2026/2028',
-    referencia: 'Anexo I e Anexo II · faina 5.9',
-    regra: {
-      taxaEstivaPorTonelada: 0.98,
-      cotasEstivaPorTerno: 7.5,
-      taxaConferentesPorTonelada: 4,
-    },
-  },
-];
-
-/** A CCT é transcrita como cadastro documental; suas regras serão validadas na substituição do catálogo. */
+/** A CCT ativa no simulador é o mapeamento provisório exclusivo da planilha. */
 export { fainasCctIniciais } from './cct.js';
 import { fainasCctIniciais } from './cct.js';
 
@@ -104,31 +57,43 @@ export class CatalogoPortmac implements CatalogoOgmo {
     if (!faina) {
       throw new Error(`Faina ${contexto.faina.codigo} não está no catálogo.`);
     }
+    const regraProvisoria = faina.regraActProvisoria ?? faina.regraCctProvisoria;
+    if (regraProvisoria) {
+      return calcularCustoComposicaoProvisoria(contexto, faina, regraProvisoria);
+    }
     if (faina.status === 'PENDENTE_DE_VALIDACAO' || !faina.regra) {
       throw new Error(`A faina ${faina.descricao} ainda está pendente de validação.`);
     }
 
-    const custoEstiva =
+    const majoracao = contexto.majoracao ?? obterMajoracaoDoPeriodo({
+      data: contexto.periodo.data,
+      periodo: contexto.periodo.identificador,
+      fonte: faina.fonte,
+    });
+    const custoEstivaBase =
       contexto.producaoToneladas *
       faina.regra.taxaEstivaPorTonelada *
       faina.regra.cotasEstivaPorTerno;
-    const custoConferentes =
+    const custoConferentesBase =
       contexto.producaoToneladas * faina.regra.taxaConferentesPorTonelada;
+    const custoEstiva = custoEstivaBase * majoracao.fator;
+    const custoConferentes = custoConferentesBase * majoracao.fator;
     const total = custoEstiva + custoConferentes;
 
     return {
       total,
+      majoracao,
       memoria: [
         {
-          descricao: `Estiva · ${faina.regra.taxaEstivaPorTonelada.toFixed(2)} × ${faina.regra.cotasEstivaPorTerno.toString().replace('.', ',')} cotas/terno`,
+          descricao: `Estiva · ${faina.regra.taxaEstivaPorTonelada.toFixed(2)} × ${faina.regra.cotasEstivaPorTerno.toString().replace('.', ',')} cotas/terno · ${descricaoDoAdicional(majoracao.adicionalPercentual)}`,
           valor: custoEstiva,
         },
         {
-          descricao: `Conferentes · ${faina.regra.taxaConferentesPorTonelada.toFixed(2)} por tonelada`,
+          descricao: `Conferentes · ${faina.regra.taxaConferentesPorTonelada.toFixed(2)} por tonelada · ${descricaoDoAdicional(majoracao.adicionalPercentual)}`,
           valor: custoConferentes,
         },
         {
-          descricao: `Fonte: ${faina.fonte} · ${faina.referencia}`,
+          descricao: `Fonte: ${faina.fonte} · ${faina.referencia} · ${majoracao.descricao}`,
           valor: total,
         },
       ],
@@ -141,7 +106,50 @@ export class CatalogoPortmac implements CatalogoOgmo {
   }
 }
 
+function calcularCustoComposicaoProvisoria(
+  contexto: ContextoDeCustoDoPeriodo,
+  faina: RegistroDeFaina,
+  regra: RegraDeComposicaoProvisoria,
+): CustoDoPeriodo {
+  const majoracao = contexto.majoracao ?? obterMajoracaoDoPeriodo({
+    data: contexto.periodo.data,
+    periodo: contexto.periodo.identificador,
+    fonte: faina.fonte,
+  });
+  const quantidadeBase = regra.regime === 'PRODUCAO'
+    ? contexto.producaoToneladas
+    : 1;
+  const fatorEncargos = 1 + regra.encargosContribuicaoAdicional;
+  const memoria = regra.composicao.map((item) => {
+    const custoBase = item.cotas * regra.taxaBase * quantidadeBase;
+    const custoTotal = custoBase * fatorEncargos * majoracao.fator * contexto.ternos;
+    const unidade = regra.regime === 'PRODUCAO' ? 'produção do período' : 'salário-dia';
+    return {
+      descricao: `${item.categoria} · ${item.homens} homens · ${item.cotas} cotas agregadas × ${regra.taxaBase.toFixed(4)} · ${unidade} · ${descricaoDoAdicional(majoracao.adicionalPercentual)} · ${contexto.ternos} terno(s)`,
+      valor: custoTotal,
+    };
+  });
+  const total = memoria.reduce((soma, item) => soma + item.valor, 0);
+
+  return {
+    total,
+    majoracao,
+    memoria: [
+      ...memoria,
+      {
+        descricao: `Fonte: ${faina.fonte} provisória · ${faina.codigoDaTabela ?? faina.codigo} · encargos/contribuições +${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(regra.encargosContribuicaoAdicional * 100)}% · ${majoracao.descricao}`,
+        valor: total,
+      },
+    ],
+  };
+}
+
+function descricaoDoAdicional(percentual: number): string {
+  if (percentual === 0) return 'preço normal';
+  return `+${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(percentual)}% de aumento`;
+}
+
 export const catalogoPortmac = new CatalogoPortmac(
-  fainasActIniciais,
+  fainasActProvisorias,
   fainasCctIniciais,
 );

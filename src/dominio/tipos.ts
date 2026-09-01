@@ -1,8 +1,9 @@
+import type { MajoracaoDoPeriodo } from './majoracoes.js';
 import type { DataLocal } from './tempo.js';
 
-export type UnidadeDeMedida = 'TON' | 'VOLUME' | 'UNIDADE' | 'CONTAINER' | 'INDEFINIDA';
+export type UnidadeDeMedida = 'TON' | 'VOLUME' | 'UNIDADE' | 'CONTAINER' | 'EQUIPE' | 'INDEFINIDA';
 
-export type StatusDaFaina = 'VALIDADA' | 'PENDENTE_DE_VALIDACAO';
+export type StatusDaFaina = 'VALIDADA' | 'PROVISORIA' | 'PENDENTE_DE_VALIDACAO';
 
 export type FonteDoCatalogo = 'ACT' | 'CCT';
 
@@ -19,6 +20,27 @@ export interface CustoOpcional {
   readonly descricao?: string;
   readonly custoTotal: number;
 }
+
+export type RegimeRemuneratorio = 'PRODUCAO' | 'SALARIO_DIA';
+
+export interface ComposicaoCctProvisoria {
+  readonly categoria: string;
+  readonly funcoes: readonly string[];
+  readonly homens: number;
+  readonly cotas: number;
+}
+
+export interface RegraDeComposicaoProvisoria {
+  readonly taxaBase: number;
+  readonly regime: RegimeRemuneratorio;
+  readonly unidade: UnidadeDeMedida;
+  /** Valor usado pela planilha como adicional de encargos/contribuições. */
+  readonly encargosContribuicaoAdicional: number;
+  readonly composicao: readonly ComposicaoCctProvisoria[];
+}
+
+export type RegraCctProvisoria = RegraDeComposicaoProvisoria;
+export type RegraActProvisoria = RegraDeComposicaoProvisoria;
 
 export interface InicioDaOperacao {
   readonly data: DataLocal;
@@ -67,6 +89,7 @@ export interface ContextoDeCustoDoPeriodo {
   readonly periodo: PeriodoOgmo;
   readonly producaoToneladas: number;
   readonly ternos: number;
+  readonly majoracao?: MajoracaoDoPeriodo;
 }
 
 export interface LinhaDeMemoria {
@@ -77,6 +100,7 @@ export interface LinhaDeMemoria {
 export interface CustoDoPeriodo {
   readonly total: number;
   readonly memoria: readonly LinhaDeMemoria[];
+  readonly majoracao?: MajoracaoDoPeriodo;
 }
 
 export interface CustoOpcionalCalculado extends CustoOpcional {
