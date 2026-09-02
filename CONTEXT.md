@@ -62,11 +62,20 @@ o custo final nem uma previsão automática da operação.
    das planilhas ACT/CCT são provisórias e calculam um terno completo.
 7. O resultado mostra custo total, custo por unidade e memória simples por
    período. O custo final soma a mão de obra aos custos opcionais informados.
-8. A sensibilidade à produtividade compara uma grade fixa e independente da
-   produtividade informada. Para cada candidato, o núcleo recalcula os
-   períodos, redistribui os ternos e executa o mesmo motor de custos. O ótimo é
-   o menor custo por unidade entre os candidatos viáveis; a produtividade-base
-   serve apenas para o cenário informado.
+8. A sensibilidade à produtividade compara uma grade derivada da operação e
+   independente da produtividade informada. Cada candidato responde a "e se a
+   operação fechasse em `k` períodos?", com produtividade
+   `volume ÷ (k × ternos por período)` arredondada para cima; a grade varre de
+   1 período até o dobro dos períodos do cenário, com mínimo de 24 e teto de
+   96. Para cada candidato, o núcleo recalcula os períodos, redistribui os
+   ternos e executa o mesmo motor de custos. O ótimo é o menor custo por
+   unidade entre os candidatos viáveis; a produtividade-base serve apenas para
+   o cenário informado e para dimensionar a largura da varredura.
+   O modelo de custo não tem limite físico de produtividade: nas fainas por
+   produção o custo de mão de obra é proporcional à quantidade movimentada, de
+   modo que só a majoração de jornada distingue os candidatos. O ótimo diz o
+   que a tabela ACT/CCT cobra em cada duração, não o que o berço consegue
+   produzir; a varredura é limitada e seu extremo pode não ser o mínimo global.
 
 ## Arquitetura de páginas
 
@@ -75,8 +84,22 @@ o custo final nem uma previsão automática da operação.
   e orçamentos associados a cada cliente.
 - **Catálogo de fainas** detalha as fainas cadastradas, sua fonte (ACT ou CCT),
   vigência e regra de cálculo.
-- A navegação atual é uma composição simples de páginas no cliente. Ainda não
-  existe persistência de clientes, simulações ou orçamentos.
+- A navegação atual é uma composição simples de páginas no cliente.
+- Os orçamentos salvos ficam no `localStorage` do navegador, agrupados por
+  cliente na página de clientes. Não existe banco, sincronização entre
+  máquinas ou histórico compartilhado: limpar os dados do navegador apaga o
+  registro.
+
+## Apresentação
+
+- `dominio/formato.ts` é a única fonte de moeda, número, percentual e do nome
+  da unidade de cada faina. Tela, impressão e memória de cálculo passam por
+  ele; nenhum módulo formata `Intl` por conta própria.
+- Cada linha da memória declara se é `MOEDA` ou `QUANTIDADE`. A camada de
+  apresentação lê essa marca em vez de adivinhar pela posição da linha.
+- `src/styles.css` é uma camada única: os tokens vivem em um único `:root`,
+  cada seletor aparece uma vez e as variações por largura ficam nas três
+  media queries do fim do arquivo.
 
 ## Limites do primeiro núcleo
 

@@ -6,7 +6,7 @@ import type {
 import type { CatalogoOgmo } from '../src/catalogo/portas.js';
 import type { PeriodoOgmo } from '../src/dominio/tipos.js';
 import { EntradaInvalida, simular } from '../src/motor/simulador.js';
-import { otimizarCenario } from '../src/motor/otimizador.js';
+import { gerarGradeDeProdutividades, otimizarCenario } from '../src/motor/otimizador.js';
 
 const catalogo: CatalogoOgmo = {
   listarFainas() {
@@ -357,5 +357,81 @@ describe('simulador mínimo', () => {
     expect(resultado.custoOpcionalTotal).toBe(500);
     expect(resultado.custoTotal).toBe(1000);
     expect(resultado.custoPorTonelada).toBe(50);
+  });
+});
+
+describe('memória do cenário', () => {
+  it('marca contagens como quantidade e dinheiro como moeda', () => {
+    const resultado = simular({
+      faina: 'GRANITO',
+      inicio: { data: data(2026, 4, 17), periodo: '07-13' },
+      volumeToneladas: 100,
+      produtividadeToneladasPorPeriodo: 25,
+      ternosPorPeriodoPadrao: 2,
+      totalDeTernos: 4,
+    }, catalogo, calendario);
+
+    const porDescricao = new Map(resultado.memoria.map((linha) => [linha.descricao, linha]));
+    // Contar ternos como dinheiro fazia a memória exibir "R$ 4,00".
+    expect(porDescricao.get('Total de ternos')?.formato).toBe('QUANTIDADE');
+    expect(porDescricao.get('Quantidade de períodos')?.formato).toBe('QUANTIDADE');
+    expect(porDescricao.get('Custo total')?.formato).toBe('MOEDA');
+    expect(porDescricao.get('Mão de obra')?.formato).toBe('MOEDA');
+  });
+
+  it('nomeia a unidade da faina no resumo', () => {
+    const resultado = simular({
+      faina: 'GRANITO',
+      inicio: { data: data(2026, 4, 17), periodo: '07-13' },
+      volumeToneladas: 100,
+      produtividadeToneladasPorPeriodo: 50,
+      ternosPorPeriodoPadrao: 1,
+      totalDeTernos: 2,
+    }, catalogo, calendario);
+
+    expect(resultado.memoria[0]?.descricao).toBe('Quantidade total (toneladas)');
+  });
+});
+
+describe('grade de produtividades da sensibilidade', () => {
+  const entrada = {
+    faina: 'GRANITO',
+    inicio: { data: data(2026, 4, 17), periodo: '07-13' },
+    volumeToneladas: 9000,
+    produtividadeToneladasPorPeriodo: 250,
+    ternosPorPeriodoPadrao: 2,
+    totalDeTernos: 36,
+  } as const;
+
+  it('deriva cada candidato de um número inteiro de períodos', () => {
+    const grade = gerarGradeDeProdutividades(entrada, 18);
+    // O arredondamento é para cima justamente para que a capacidade cubra o
+    // volume no mesmo número de períodos que originou o candidato.
+    for (const produtividade of grade) {
+      const periodos = Math.ceil(entrada.volumeToneladas / (produtividade * entrada.ternosPorPeriodoPadrao));
+      expect(produtividade * entrada.ternosPorPeriodoPadrao * periodos).toBeGreaterThanOrEqual(entrada.volumeToneladas);
+    }
+  });
+
+  it('cobre pelo menos o dobro dos períodos do cenário informado', () => {
+    const grade = gerarGradeDeProdutividades(entrada, 18);
+    const maisLenta = Math.min(...grade);
+    expect(Math.ceil(entrada.volumeToneladas / (maisLenta * 2))).toBeGreaterThanOrEqual(36);
+  });
+
+  it('não repete produtividades e ignora operações sem volume', () => {
+    const grade = gerarGradeDeProdutividades(entrada, 4);
+    expect(new Set(grade).size).toBe(grade.length);
+    expect(gerarGradeDeProdutividades({ ...entrada, volumeToneladas: 0 }, 4)).toEqual([]);
+  });
+
+  it('alimenta o otimizador com cenários viáveis do próprio volume', () => {
+    const otimizacao = otimizarCenario(entrada, catalogo, calendario, gerarGradeDeProdutividades(entrada, 18));
+    expect(otimizacao.candidatos.length).toBeGreaterThan(1);
+    for (const candidato of otimizacao.candidatos) {
+      expect(candidato.resultado.custoPorTonelada).toBeGreaterThan(0);
+    }
+    expect(otimizacao.melhor?.resultado.custoPorTonelada)
+      .toBe(Math.min(...otimizacao.candidatos.map((candidato) => candidato.resultado.custoPorTonelada)));
   });
 });

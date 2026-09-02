@@ -5,7 +5,8 @@ import type {
   RegraDeComposicaoProvisoria,
 } from '../dominio/tipos.js';
 import type { CatalogoOgmo } from './portas.js';
-import { obterMajoracaoDoPeriodo } from '../dominio/majoracoes.js';
+import { descricaoDoAdicional, obterMajoracaoDoPeriodo } from '../dominio/majoracoes.js';
+import { formatarNumero, formatarPercentual } from '../dominio/formato.js';
 import { fainasActProvisorias } from './act-provisorio.js';
 
 export interface RegraDeCustoPorTonelada {
@@ -85,11 +86,11 @@ export class CatalogoPortmac implements CatalogoOgmo {
       majoracao,
       memoria: [
         {
-          descricao: `Estiva · ${faina.regra.taxaEstivaPorTonelada.toFixed(2)} × ${faina.regra.cotasEstivaPorTerno.toString().replace('.', ',')} cotas/terno · ${descricaoDoAdicional(majoracao.adicionalPercentual)}`,
+          descricao: `Estiva · ${formatarNumero(faina.regra.taxaEstivaPorTonelada)} × ${formatarNumero(faina.regra.cotasEstivaPorTerno)} cotas/terno · ${descricaoDoAdicional(majoracao.adicionalPercentual)}`,
           valor: custoEstiva,
         },
         {
-          descricao: `Conferentes · ${faina.regra.taxaConferentesPorTonelada.toFixed(2)} por tonelada · ${descricaoDoAdicional(majoracao.adicionalPercentual)}`,
+          descricao: `Conferentes · ${formatarNumero(faina.regra.taxaConferentesPorTonelada)} por tonelada · ${descricaoDoAdicional(majoracao.adicionalPercentual)}`,
           valor: custoConferentes,
         },
         {
@@ -130,7 +131,7 @@ function calcularCustoComposicaoProvisoria(
     const custoTotal = custoBase * fatorEncargos * majoracao.fator * multiplicaPorTernos;
     const unidade = regra.regime === 'PRODUCAO' ? 'produção do período' : 'salário-dia';
     return {
-      descricao: `${item.categoria} · ${item.homens} homens · ${regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 'tarifa unitária' : `${item.cotas} cotas agregadas`} × ${regra.taxaBase.toFixed(4)} · ${unidade} · ${descricaoDoAdicional(majoracao.adicionalPercentual)}${regra.regime === 'SALARIO_DIA' ? ` · ${contexto.ternos} terno(s)` : ' · produção agregada dos ternos'}`,
+      descricao: `${item.categoria} · ${item.homens} homens · ${regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 'tarifa unitária' : `${formatarNumero(item.cotas)} cotas agregadas`} × ${formatarNumero(regra.taxaBase, 4)} · ${unidade} · ${descricaoDoAdicional(majoracao.adicionalPercentual)}${regra.regime === 'SALARIO_DIA' ? ` · ${contexto.ternos} terno(s)` : ' · produção agregada dos ternos'}`,
       valor: custoTotal,
     };
   });
@@ -142,16 +143,11 @@ function calcularCustoComposicaoProvisoria(
     memoria: [
       ...memoria,
       {
-        descricao: `Fonte: ${faina.fonte} provisória · ${faina.codigoDaTabela ?? faina.codigo} · ${regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 'tarifa unitária; composição não multiplicada por cotas' : 'cotas da equipe'} · encargos/contribuições +${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(regra.encargosContribuicaoAdicional * 100)}% · ${majoracao.descricao}`,
+        descricao: `Fonte: ${faina.fonte} provisória · ${faina.codigoDaTabela ?? faina.codigo} · ${regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 'tarifa unitária; composição não multiplicada por cotas' : 'cotas da equipe'} · encargos/contribuições +${formatarPercentual(regra.encargosContribuicaoAdicional * 100)} · ${majoracao.descricao}`,
         valor: total,
       },
     ],
   };
-}
-
-function descricaoDoAdicional(percentual: number): string {
-  if (percentual === 0) return 'preço normal';
-  return `+${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(percentual)}% de aumento`;
 }
 
 export const catalogoPortmac = new CatalogoPortmac(

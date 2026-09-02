@@ -1,3 +1,4 @@
+import { formatarPercentual } from './formato.js';
 import type { FonteDoCatalogo } from './tipos.js';
 import { diaDaSemana, type DataLocal } from './tempo.js';
 
@@ -89,11 +90,7 @@ export function obterMajoracaoDoPeriodo(entrada: EntradaDeMajoracao): MajoracaoD
   };
 }
 
-function descricaoDoAdicional(percentual: number): string {
+export function descricaoDoAdicional(percentual: number): string {
   if (percentual === 0) return 'preço normal';
   return `+${formatarPercentual(percentual)} de aumento`;
-}
-
-function formatarPercentual(percentual: number): string {
-  return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(percentual)}%`;
 }

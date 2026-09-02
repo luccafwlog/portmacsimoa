@@ -123,6 +123,13 @@ export function formatarDataPtBr(d: DataLocal): string {
   return `${dd}/${mm}/${d.ano}`;
 }
 
+/** `31/08` — datas repetidas em eixos e tabelas onde o ano é redundante. */
+export function formatarDataCurtaPtBr(d: DataLocal): string {
+  const mm = String(d.mes).padStart(2, '0');
+  const dd = String(d.dia).padStart(2, '0');
+  return `${dd}/${mm}`;
+}
+
 export function formatarInstante(i: InstanteLocal): string {
   const hh = String(i.hora).padStart(2, '0');
   const mi = String(i.minuto).padStart(2, '0');
