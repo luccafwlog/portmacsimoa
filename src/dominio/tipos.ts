@@ -98,9 +98,19 @@ export interface ContextoDeCustoDoPeriodo {
   readonly majoracao?: MajoracaoDoPeriodo;
 }
 
+/**
+ * Como o valor de uma linha de memória deve ser lido.
+ *
+ * Sem esta marca a camada de apresentação precisa adivinhar pela posição da
+ * linha — foi assim que o total de ternos passou a ser exibido como `R$ 36,00`.
+ */
+export type FormatoDeMemoria = 'MOEDA' | 'QUANTIDADE';
+
 export interface LinhaDeMemoria {
   readonly descricao: string;
   readonly valor: number;
+  /** Ausente equivale a `MOEDA`: a maioria das linhas é dinheiro. */
+  readonly formato?: FormatoDeMemoria;
 }
 
 export interface CustoDoPeriodo {

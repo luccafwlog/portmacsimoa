@@ -16,6 +16,15 @@ O projeto não estima entradas, não escolhe a melhor operação e não administ
 operação. A redistribuição de ternos é um cenário manual: a soma dos ternos
 precisa permanecer igual ao total informado.
 
+A sensibilidade à produtividade compara durações alternativas da mesma
+operação: cada candidato é "fechar em `k` períodos", com a produtividade por
+terno que isso exigiria. A grade sai do volume e dos ternos informados, nunca
+da produtividade digitada. Como o modelo de custo não conhece limite físico de
+produtividade, o ótimo indica o que a tabela ACT/CCT cobra em cada duração, e
+não o que o berço consegue produzir.
+
+Os orçamentos salvos ficam apenas no `localStorage` do navegador.
+
 As regras e os valores do OGMO entram por duas portas: `CatalogoOgmo` fornece a
 faina e calcula o custo de cada período; `CalendarioOgmo` projeta os períodos a
 partir de uma data e de um identificador de período. Os detalhes oficiais ainda

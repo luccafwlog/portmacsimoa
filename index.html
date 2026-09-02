@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#062f52" />
+    <link rel="icon" href="/brand/portmac-blue.png" />
+    <meta name="description" content="Calculadora interna da PORTMAC para cotação preliminar de custo de operação portuária." />
     <title>SCO · Simulador de Custo de Operação</title>
   </head>
   <body>
@@ -78,19 +80,21 @@
 
                 <div class="operation-row operation-row-metrics">
                   <label class="field">
-                    <span id="volume-field-label">Volume do navio <b>ton</b></span>
+                    <span id="volume-field-label">Volume do navio</span>
                     <input id="volume" type="number" min="0.01" step="0.01" placeholder="Informe a quantidade" required />
+                    <small id="volume-field-hint">quantidade total a movimentar</small>
                   </label>
                   <label class="field">
-                    <span id="productivity-field-label">Produtividade por terno <b>ton / terno / período</b></span>
+                    <span id="productivity-field-label">Produtividade por terno</span>
                     <input id="produtividade" type="number" min="0.01" step="0.01" placeholder="Informe a capacidade" required />
+                    <small id="productivity-field-hint">quantidade por terno em um período</small>
                   </label>
                   <div class="period-preview" aria-live="polite">
                     <div>
-                      <span class="preview-label">TOTAL DE PERÍODOS CALCULADOS</span>
-                      <small>volume ÷ (produtividade × ternos por período), arredondado para cima</small>
+                      <span class="preview-label">Total de períodos calculados</span>
+                      <strong id="calculated-periods">—</strong>
                     </div>
-                    <strong id="calculated-periods">—</strong>
+                    <small>volume ÷ (produtividade por terno × ternos por período), arredondado para cima</small>
                   </div>
                   <label class="field">
                     <span>Ternos por período <b>1 a 4</b></span>
@@ -172,7 +176,7 @@
                     <h2 id="ternos-editor-title">Detalhamento por períodos</h2>
                   </div>
                   <div class="ternos-editor-summary">
-                    <span id="ternos-editor-count" class="sum-badge">11 períodos</span>
+                    <span id="ternos-editor-count" class="sum-badge">—</span>
                     <span class="editor-expand-hint" aria-hidden="true">abrir</span>
                   </div>
                 </summary>
@@ -202,11 +206,13 @@
                 </div>
               </details>
 
-              <div class="form-section-divider" aria-hidden="true"></div>
-              <button class="primary-button" type="submit">
-                <span>Calcular cenário</span>
-                <span class="button-arrow" aria-hidden="true">↗</span>
-              </button>
+              <div class="form-actions">
+                <p class="form-actions-hint">O cenário é recalculado do zero a cada envio.</p>
+                <button class="primary-button" type="submit">
+                  <span>Calcular cenário</span>
+                  <span class="button-arrow" aria-hidden="true">↗</span>
+                </button>
+              </div>
             </form>
           </section>
 
@@ -216,33 +222,33 @@
             <section id="empty-state" class="panel empty-state">
               <div class="empty-mark">↘</div>
               <h2>Seu cenário aparece aqui</h2>
-              <p>Preencha os dados ao lado para enxergar o custo por período e o total da operação.</p>
+              <p>Preencha os dados acima e calcule o cenário para ver o custo por período e o total da operação.</p>
             </section>
 
             <section id="result-state" class="result-state" hidden>
               <div class="result-intro">
                 <div>
                   <span class="eyebrow">RESULTADO DO CENÁRIO</span>
-                  <h2 id="result-faina">Granito</h2>
+                  <h2 id="result-faina"></h2>
                   <p id="result-client" class="result-client">Cliente não informado</p>
                 </div>
-                <span id="result-source" class="result-chip">ACT · 2026/2028</span>
+                <span id="result-source" class="result-chip"></span>
               </div>
 
               <div class="metrics-grid">
                 <div class="metric metric-primary">
                   <span id="cost-per-unit-label">Custo por tonelada</span>
-                  <strong id="cost-per-ton">R$ 0,00</strong>
+                  <strong id="cost-per-ton">—</strong>
                   <small>referência da cotação</small>
                 </div>
                 <div class="metric">
                   <span>Custo total</span>
-                  <strong id="cost-total">R$ 0,00</strong>
+                  <strong id="cost-total">—</strong>
                   <small>operação completa</small>
                 </div>
                 <div class="metric">
                   <span>Períodos calculados</span>
-                  <strong id="period-count">0</strong>
+                  <strong id="period-count">—</strong>
                   <small>requisitados</small>
                 </div>
               </div>
@@ -257,13 +263,13 @@
                 </div>
                 <div class="cost-lines">
                   <div class="cost-line">
-                    <div><span>Mão de obra</span><small id="labor-cost-per-unit">R$ 0,00 / ton</small></div>
-                    <strong id="labor-cost-total">R$ 0,00</strong>
+                    <div><span>Mão de obra</span><small id="labor-cost-per-unit"></small></div>
+                    <strong id="labor-cost-total">—</strong>
                   </div>
                   <div id="optional-cost-lines"></div>
                   <div class="cost-line cost-line-total">
                     <div><span>Custo total da operação</span><small>valor final do cenário</small></div>
-                    <strong id="composed-cost-total">R$ 0,00</strong>
+                    <strong id="composed-cost-total">—</strong>
                   </div>
                 </div>
               </section>
@@ -271,7 +277,7 @@
               <section class="calculation-strip">
                 <div>
                   <span class="strip-label">MEMÓRIA DO CÁLCULO</span>
-                  <p id="calculation-summary">105 ton ÷ 10 ton/período = 11 períodos</p>
+                  <p id="calculation-summary"></p>
                 </div>
                 <span class="strip-arrow">→</span>
               </section>
@@ -306,7 +312,7 @@
                   </div>
                   <span id="productivity-sensitivity-summary" class="sum-badge">cenários comparativos</span>
                 </div>
-                <p class="panel-caption sensitivity-caption">O simulador compara uma grade independente de produtividades, recalcula os períodos e aponta o menor custo por unidade. A faixa de produtividade é provisória, baseada na série “Gráficos” da planilha legada; o custo de cada cenário é recalculado pelo motor oficial.</p>
+                <p class="panel-caption sensitivity-caption">Cada cenário comparado responde a “e se a operação fechasse em <em>n</em> períodos?”. A grade sai do volume e dos ternos informados — nunca da produtividade digitada — e cada ponto é recalculado pelo motor oficial. O modelo de custo não conhece limite físico de produtividade: nas fainas por produção o menor custo por unidade tende sempre ao cenário mais curto, porque só a majoração de jornada muda. Leia o ótimo como o que a tabela ACT/CCT cobra, não como o que o berço consegue produzir.</p>
                 <div id="productivity-sensitivity-body" class="productivity-sensitivity-body"></div>
               </section>
 
@@ -337,10 +343,23 @@
           <p>Consulte as simulações e os orçamentos realizados para cada cliente em um só lugar.</p>
         </section>
 
+        <div class="catalog-stats">
+          <div class="catalog-stat"><span>CLIENTES COM ORÇAMENTO</span><strong id="clients-count">0</strong></div>
+          <div class="catalog-stat"><span>ORÇAMENTOS SALVOS</span><strong id="clients-budget-count">0</strong></div>
+          <div class="catalog-stat"><span>ARMAZENAMENTO</span><strong class="catalog-stat-note">neste navegador</strong></div>
+        </div>
+
         <section class="panel page-card">
           <div class="panel-heading">
             <div><span class="section-index">01</span><h2>Registro de clientes e cotações</h2></div>
             <span class="required-note">histórico</span>
+          </div>
+          <div id="clients-toolbar" class="catalog-toolbar" hidden>
+            <label class="catalog-search">
+              <span>Buscar cliente ou faina</span>
+              <input id="clients-search" type="search" placeholder="Nome do cliente ou da faina" autocomplete="off" />
+            </label>
+            <span class="catalog-legend">orçamentos gravados localmente</span>
           </div>
           <div id="clients-empty" class="page-empty-state">
             <div class="empty-mark">⌁</div>

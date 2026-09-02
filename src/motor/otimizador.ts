@@ -14,6 +14,42 @@ export interface ResultadoDeOtimizacao {
   readonly melhor: PontoDeOtimizacao | undefined;
 }
 
+/** Teto de candidatos da grade; cada um custa uma simulação completa. */
+const PERIODOS_MAXIMOS_DA_GRADE = 96;
+const PERIODOS_MINIMOS_DA_GRADE = 24;
+
+/**
+ * Grade de comparação derivada da operação, não da produtividade informada.
+ *
+ * Cada candidato responde a uma pergunta operacional — "e se a operação fechar
+ * em k períodos?" — e a produtividade correspondente sai de `volume ÷ (k ×
+ * ternos por período)`. A grade depende apenas do volume e dos ternos, que são
+ * fatos da operação; a produtividade-base entra somente na largura da faixa
+ * varrida, nunca na escolha do ótimo.
+ *
+ * O arredondamento é sempre para cima: uma produtividade truncada para baixo
+ * empurraria `ceil(volume ÷ capacidade)` para k + 1 e a grade repetiria
+ * períodos.
+ */
+export function gerarGradeDeProdutividades(
+  entrada: EntradaDeSimulacao,
+  periodosDoCenario: number,
+): readonly number[] {
+  const ternosPorPeriodo = entrada.ternosPorPeriodoPadrao ?? 1;
+  if (!(entrada.volumeToneladas > 0) || ternosPorPeriodo <= 0) return [];
+  const limite = Math.min(
+    PERIODOS_MAXIMOS_DA_GRADE,
+    Math.max(PERIODOS_MINIMOS_DA_GRADE, Math.ceil(periodosDoCenario * 2)),
+  );
+  const grade = new Set<number>();
+  for (let periodos = 1; periodos <= limite; periodos += 1) {
+    const exata = entrada.volumeToneladas / (periodos * ternosPorPeriodo);
+    const arredondada = Math.ceil(exata * 100) / 100;
+    if (arredondada > 0 && Number.isFinite(arredondada)) grade.add(arredondada);
+  }
+  return [...grade];
+}
+
 /**
  * Compara produtividades a partir de uma grade externa e fixa.
  *

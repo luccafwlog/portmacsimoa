@@ -7,6 +7,7 @@ import type {
   ResultadoDeSimulacao,
 } from '../dominio/tipos.js';
 import { obterMajoracaoDoPeriodo } from '../dominio/majoracoes.js';
+import { rotuloDaUnidade } from '../dominio/formato.js';
 import { ehFeriadoVilaVelha } from '../calendario/feriados.js';
 
 export class EntradaInvalida extends Error {
@@ -46,13 +47,8 @@ export function simular(
   const quantidadeDePeriodos = Math.ceil(
     entrada.volumeToneladas / capacidadePorPeriodo,
   );
-  if (entrada.ternosPorPeriodoPadrao !== undefined) {
-    if (!Number.isInteger(entrada.ternosPorPeriodoPadrao) || entrada.ternosPorPeriodoPadrao < 1 || entrada.ternosPorPeriodoPadrao > 4) {
-      throw new EntradaInvalida('Os ternos por período devem ser um inteiro entre 1 e 4.');
-    }
-    if (entrada.totalDeTernos !== entrada.ternosPorPeriodoPadrao * quantidadeDePeriodos) {
-      throw new EntradaInvalida('O total de ternos deve ser igual aos períodos multiplicados pelos ternos por período.');
-    }
+  if (ternosPadrao !== undefined && entrada.totalDeTernos !== ternosPadrao * quantidadeDePeriodos) {
+    throw new EntradaInvalida('O total de ternos deve ser igual aos períodos multiplicados pelos ternos por período.');
   }
   if (entrada.totalDeTernos > quantidadeDePeriodos * 4) {
     throw new EntradaInvalida(
@@ -113,16 +109,16 @@ export function simular(
   }));
   const custoOpcionalTotal = custosOpcionais.reduce((total, custo) => total + custo.custoTotal, 0);
   const custoTotal = custoDeMaoDeObra + custoOpcionalTotal;
-  const unidadeOperacional = nomeDaUnidade(faina.unidade);
+  const unidadeOperacional = rotuloDaUnidade(faina.unidade).plural;
   const memoria: LinhaDeMemoria[] = [
-    { descricao: `Quantidade total (${unidadeOperacional})`, valor: entrada.volumeToneladas },
-    { descricao: `Produtividade (${unidadeOperacional} por terno por período)`, valor: entrada.produtividadeToneladasPorPeriodo },
-    { descricao: `Capacidade nominal (${unidadeOperacional} por período)`, valor: capacidadePorPeriodo },
-    { descricao: 'Quantidade de períodos', valor: quantidadeDePeriodos },
-    { descricao: 'Total de ternos', valor: entrada.totalDeTernos },
-    { descricao: 'Mão de obra', valor: custoDeMaoDeObra },
-    { descricao: 'Custos opcionais', valor: custoOpcionalTotal },
-    { descricao: 'Custo total', valor: custoTotal },
+    { descricao: `Quantidade total (${unidadeOperacional})`, valor: entrada.volumeToneladas, formato: 'QUANTIDADE' },
+    { descricao: `Produtividade (${unidadeOperacional} por terno por período)`, valor: entrada.produtividadeToneladasPorPeriodo, formato: 'QUANTIDADE' },
+    { descricao: `Capacidade nominal (${unidadeOperacional} por período)`, valor: capacidadePorPeriodo, formato: 'QUANTIDADE' },
+    { descricao: 'Quantidade de períodos', valor: quantidadeDePeriodos, formato: 'QUANTIDADE' },
+    { descricao: 'Total de ternos', valor: entrada.totalDeTernos, formato: 'QUANTIDADE' },
+    { descricao: 'Mão de obra', valor: custoDeMaoDeObra, formato: 'MOEDA' },
+    { descricao: 'Custos opcionais', valor: custoOpcionalTotal, formato: 'MOEDA' },
+    { descricao: 'Custo total', valor: custoTotal, formato: 'MOEDA' },
   ];
 
   return {
@@ -137,16 +133,6 @@ export function simular(
     custoPorTonelada: custoTotal / entrada.volumeToneladas,
     memoria,
   };
-}
-
-function nomeDaUnidade(unidade: string): string {
-  switch (unidade) {
-    case 'UNIDADE': return 'unidades';
-    case 'CONTAINER': return 'contêineres';
-    case 'EQUIPE': return 'equipes';
-    case 'VOLUME': return 'volumes';
-    default: return 'toneladas';
-  }
 }
 
 function validarEntrada(entrada: EntradaDeSimulacao): void {
