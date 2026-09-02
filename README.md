@@ -16,12 +16,16 @@ O projeto não estima entradas, não escolhe a melhor operação e não administ
 operação. A redistribuição de ternos é um cenário manual: a soma dos ternos
 precisa permanecer igual ao total informado.
 
-A sensibilidade à produtividade compara durações alternativas da mesma
-operação: cada candidato é "fechar em `k` períodos", com a produtividade por
-terno que isso exigiria. A grade sai do volume e dos ternos informados, nunca
-da produtividade digitada. Como o modelo de custo não conhece limite físico de
-produtividade, o ótimo indica o que a tabela ACT/CCT cobra em cada duração, e
-não o que o berço consegue produzir.
+O cenário tem três entradas: volume do navio, produtividade por terno por
+período e ternos por período. A quantidade de períodos é
+`ceil(volume ÷ produtividade ÷ ternos)` e o total de ternos é
+`períodos × ternos por período` — 19.500 toneladas a 750 t com 2 ternos dão
+13 períodos e 26 ternos.
+
+O detalhamento por períodos permite redistribuir ternos e produtividade período
+a período, com um gráfico que acompanha cada ajuste ao vivo e mostra onde o
+adicional de jornada encarece a operação. Depois do cálculo, o mesmo desenho
+reaparece no resultado sobre o cenário aceito pelo motor.
 
 Os orçamentos salvos ficam apenas no `localStorage` do navegador.
 

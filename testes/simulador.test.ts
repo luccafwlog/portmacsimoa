@@ -6,7 +6,6 @@ import type {
 import type { CatalogoOgmo } from '../src/catalogo/portas.js';
 import type { PeriodoOgmo } from '../src/dominio/tipos.js';
 import { EntradaInvalida, simular } from '../src/motor/simulador.js';
-import { gerarGradeDeProdutividades, otimizarCenario } from '../src/motor/otimizador.js';
 
 const catalogo: CatalogoOgmo = {
   listarFainas() {
@@ -288,54 +287,6 @@ describe('simulador mínimo', () => {
     expect(resultado.custoPorTonelada).toBe(75);
   });
 
-  it('calcula o ótimo em uma grade independente da produtividade informada', () => {
-    const entradaComProdutividadeBaixa = {
-      ...entrada,
-      volumeToneladas: 20,
-      produtividadeToneladasPorPeriodo: 5,
-      totalDeTernos: 3,
-      produtividadesPorPeriodo: [5, 5, 5, 5],
-    };
-    const { produtividadesPorPeriodo: _produtividades, ...entradaSemAjustes } = entradaComProdutividadeBaixa;
-    const entradaComProdutividadeAlta = {
-      ...entradaSemAjustes,
-      produtividadeToneladasPorPeriodo: 20,
-    };
-
-    const primeiraAnalise = otimizarCenario(
-      entradaComProdutividadeBaixa,
-      catalogo,
-      calendario,
-      [5, 10, 20],
-    );
-    const segundaAnalise = otimizarCenario(
-      entradaComProdutividadeAlta,
-      catalogo,
-      calendario,
-      [5, 10, 20],
-    );
-
-    expect(primeiraAnalise.melhor?.produtividade).toBe(20);
-    expect(segundaAnalise.melhor?.produtividade).toBe(20);
-    expect(primeiraAnalise.melhor?.periodos).toBe(1);
-    expect(primeiraAnalise.candidatos.map((candidato) => candidato.produtividade)).toEqual([10, 20]);
-    expect(primeiraAnalise.melhor?.resultado.periodos.reduce((total, periodo) => total + periodo.producaoToneladas, 0)).toBe(20);
-
-    const analiseComDoisTernos = otimizarCenario(
-      {
-        ...entradaSemAjustes,
-        volumeToneladas: 20,
-        produtividadeToneladasPorPeriodo: 10,
-        ternosPorPeriodoPadrao: 2,
-        totalDeTernos: 4,
-      },
-      catalogo,
-      calendario,
-      [5, 10, 20],
-    );
-    expect(analiseComDoisTernos.candidatos.map((candidato) => candidato.resultado.entrada.totalDeTernos)).toEqual([4, 2, 2]);
-  });
-
   it('aceita vários custos opcionais personalizados com descrição', () => {
     const resultado = simular(
       {
@@ -390,48 +341,5 @@ describe('memória do cenário', () => {
     }, catalogo, calendario);
 
     expect(resultado.memoria[0]?.descricao).toBe('Quantidade total (toneladas)');
-  });
-});
-
-describe('grade de produtividades da sensibilidade', () => {
-  const entrada = {
-    faina: 'GRANITO',
-    inicio: { data: data(2026, 4, 17), periodo: '07-13' },
-    volumeToneladas: 9000,
-    produtividadeToneladasPorPeriodo: 250,
-    ternosPorPeriodoPadrao: 2,
-    totalDeTernos: 36,
-  } as const;
-
-  it('deriva cada candidato de um número inteiro de períodos', () => {
-    const grade = gerarGradeDeProdutividades(entrada, 18);
-    // O arredondamento é para cima justamente para que a capacidade cubra o
-    // volume no mesmo número de períodos que originou o candidato.
-    for (const produtividade of grade) {
-      const periodos = Math.ceil(entrada.volumeToneladas / (produtividade * entrada.ternosPorPeriodoPadrao));
-      expect(produtividade * entrada.ternosPorPeriodoPadrao * periodos).toBeGreaterThanOrEqual(entrada.volumeToneladas);
-    }
-  });
-
-  it('cobre pelo menos o dobro dos períodos do cenário informado', () => {
-    const grade = gerarGradeDeProdutividades(entrada, 18);
-    const maisLenta = Math.min(...grade);
-    expect(Math.ceil(entrada.volumeToneladas / (maisLenta * 2))).toBeGreaterThanOrEqual(36);
-  });
-
-  it('não repete produtividades e ignora operações sem volume', () => {
-    const grade = gerarGradeDeProdutividades(entrada, 4);
-    expect(new Set(grade).size).toBe(grade.length);
-    expect(gerarGradeDeProdutividades({ ...entrada, volumeToneladas: 0 }, 4)).toEqual([]);
-  });
-
-  it('alimenta o otimizador com cenários viáveis do próprio volume', () => {
-    const otimizacao = otimizarCenario(entrada, catalogo, calendario, gerarGradeDeProdutividades(entrada, 18));
-    expect(otimizacao.candidatos.length).toBeGreaterThan(1);
-    for (const candidato of otimizacao.candidatos) {
-      expect(candidato.resultado.custoPorTonelada).toBeGreaterThan(0);
-    }
-    expect(otimizacao.melhor?.resultado.custoPorTonelada)
-      .toBe(Math.min(...otimizacao.candidatos.map((candidato) => candidato.resultado.custoPorTonelada)));
   });
 });

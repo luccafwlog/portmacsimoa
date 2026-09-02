@@ -1,10 +1,10 @@
 import './styles.css';
-import { data, formatarDataCurtaPtBr, formatarDataPtBr } from './dominio/tempo.js';
+import { data, formatarData, formatarDataCurtaPtBr, formatarDataPtBr } from './dominio/tempo.js';
 import { calendarioOperacional } from './calendario/operacional.js';
 import { catalogoPortmac } from './catalogo/portmac.js';
 import type { CustoOpcional, EntradaDeSimulacao, LinhaDeMemoria, PeriodoOgmo, ResultadoDeSimulacao, TipoDeCustoOpcional } from './dominio/tipos.js';
-import { simular } from './motor/simulador.js';
-import { gerarGradeDeProdutividades, otimizarCenario, type ResultadoDeOtimizacao } from './motor/otimizador.js';
+import type { MajoracaoDoPeriodo } from './dominio/majoracoes.js';
+import { majoracaoDoPeriodoProjetado, simular } from './motor/simulador.js';
 import { formatarMoeda, formatarNumero, pluralizar, rotuloDaUnidade } from './dominio/formato.js';
 
 const form = document.querySelector<HTMLFormElement>('#simulation-form')!;
@@ -37,6 +37,8 @@ let currentResult: ResultadoDeSimulacao | undefined;
 let customCostCounter = 0;
 let draftDistribution: readonly number[] = [];
 let draftProductivities: readonly number[] = [];
+let periodosDoEditor: readonly PeriodoOgmo[] = [];
+let chaveDosPeriodosDoEditor = '';
 let fainaOptionIndex = -1;
 let catalogSourceFilter: 'TODAS' | 'ACT' | 'CCT' = 'TODAS';
 const SAVED_BUDGETS_KEY = 'sco-orcamentos-salvos';
@@ -46,18 +48,6 @@ interface OrcamentoSalvo {
   readonly cliente: string;
   readonly criadoEm: string;
   readonly resultado: ResultadoDeSimulacao;
-}
-
-interface PontoDeSensibilidade {
-  readonly produtividade: number;
-  readonly custoPorTonelada: number;
-  readonly periodos: number;
-  readonly ehCenarioAtual?: boolean;
-}
-
-interface AnaliseDeSensibilidade {
-  readonly pontos: readonly PontoDeSensibilidade[];
-  readonly otimizacao: ResultadoDeOtimizacao;
 }
 
 const fainasSelecionaveis = catalogoPortmac.listarFainas()
@@ -460,7 +450,6 @@ function render(resultado: ResultadoDeSimulacao): void {
     : `${formatarNumero(resultado.entrada.volumeToneladas)} ${unidade.abreviacao} ÷ (${formatarNumero(resultado.entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/terno/período × ${ternosPorPeriodoTexto}) = ${pluralizar(resultado.quantidadeDePeriodos, 'período', 'períodos')} · calendário de Vila Velha aplicado`);
   renderCalculationMemory(resultado);
   renderPeriodCostChart(resultado);
-  renderProductivitySensitivity(resultado);
   renderTernosEditor(resultado);
   // Um cenário novo é um orçamento novo: sem restaurar o rótulo, o botão
   // continuava anunciando "Orçamento salvo" para um resultado ainda não salvo.
@@ -483,21 +472,27 @@ function render(resultado: ResultadoDeSimulacao): void {
  */
 const GRAFICO = {
   largura: 860,
-  altura: 340,
+  // A base acomoda três linhas de rótulo — data, faixa e ternos — mais o
+  // título do eixo, que antes se sobrepunha à linha dos ternos.
+  altura: 362,
   esquerda: 132,
   direita: 28,
   topo: 28,
-  base: 76,
+  base: 98,
 } as const;
 const GRAFICO_LARGURA_UTIL = GRAFICO.largura - GRAFICO.esquerda - GRAFICO.direita;
 const GRAFICO_ALTURA_UTIL = GRAFICO.altura - GRAFICO.topo - GRAFICO.base;
 
 /** Linhas de grade horizontais com o rótulo do eixo Y já formatado. */
-function gradeHorizontal(escalaY: (valor: number) => number, valores: readonly number[]): string {
+function gradeHorizontal(
+  escalaY: (valor: number) => number,
+  valores: readonly number[],
+  formatar: (valor: number) => string = formatarValorEixo,
+): string {
   return valores.map((valor) => {
     const y = escalaY(valor).toFixed(2);
     return `<line class="chart-grid-line" x1="${GRAFICO.esquerda}" y1="${y}" x2="${GRAFICO.largura - GRAFICO.direita}" y2="${y}" />
-      <text class="chart-axis-label chart-axis-label-y" x="${GRAFICO.esquerda - 12}" y="${(Number(y) + 4).toFixed(2)}">${escapeHtml(formatarValorEixo(valor))}</text>`;
+      <text class="chart-axis-label chart-axis-label-y" x="${GRAFICO.esquerda - 12}" y="${(Number(y) + 4).toFixed(2)}">${escapeHtml(formatar(valor))}</text>`;
   }).join('');
 }
 
@@ -513,181 +508,112 @@ function passoDeRotulos(total: number, maximo = 12): number {
   return total <= maximo ? 1 : Math.ceil(total / maximo);
 }
 
+/**
+ * Uma barra do cenário: o que um período movimenta, com quantos ternos e a
+ * que custo. O rascunho em edição e o resultado calculado produzem a mesma
+ * forma, então os dois gráficos são o mesmo desenho com dados diferentes.
+ */
+interface BarraDoCenario {
+  readonly periodo: PeriodoOgmo;
+  readonly producao: number;
+  readonly ternos: number;
+  readonly majoracao: MajoracaoDoPeriodo | undefined;
+  /** Ausente quando a faina ainda não permite calcular o custo do período. */
+  readonly custo: number | undefined;
+}
+
+/**
+ * Desenha o cenário período a período.
+ *
+ * Prefere custo no eixo Y; cai para produção quando ainda não há regra de custo
+ * aplicável. A cor separa preço normal de período com adicional de jornada,
+ * que é o que faz a barra saltar ao mover um terno para a madrugada.
+ */
+function renderScenarioChart(
+  container: HTMLElement,
+  barras: readonly BarraDoCenario[],
+  unidade: ReturnType<typeof rotuloDaUnidade>,
+): void {
+  if (!barras.length) {
+    container.removeAttribute('role');
+    container.removeAttribute('aria-label');
+    container.innerHTML = '';
+    return;
+  }
+  const temCusto = barras.every((barra) => barra.custo !== undefined);
+  const valorDaBarra = (barra: BarraDoCenario) => temCusto ? barra.custo! : barra.producao;
+  const formatarValor = (valor: number) => temCusto ? formatarMoeda(valor) : `${formatarNumero(valor)} ${unidade.abreviacao}`;
+  const formatarEixo = (valor: number) => temCusto
+    ? formatarValorEixo(valor)
+    : formatarNumero(valor, valor >= 100 ? 0 : 2);
+  const valores = barras.map(valorDaBarra);
+  const maior = Math.max(...valores, 0);
+  const total = valores.reduce((soma, valor) => soma + valor, 0);
+  const majorados = barras.filter((barra) => (barra.majoracao?.adicionalPercentual ?? 0) > 0).length;
+
+  const { esquerda, topo, altura, base } = GRAFICO;
+  const y = (valor: number) => topo + GRAFICO_ALTURA_UTIL - (maior > 0 ? valor / maior : 0) * GRAFICO_ALTURA_UTIL;
+  const divisoes = 4;
+  const grade = gradeHorizontal(y, Array.from({ length: divisoes + 1 }, (_, indice) => (maior / divisoes) * indice), formatarEixo);
+  const vao = GRAFICO_LARGURA_UTIL / barras.length;
+  const largura = Math.max(4, Math.min(34, vao * .62));
+  const passo = passoDeRotulos(barras.length);
+  // Os ternos só cabem embaixo de cada barra quando há espaço para o dígito.
+  const mostrarTernos = vao >= 22;
+  const svgBarras = barras.map((barra, indice) => {
+    const valor = valorDaBarra(barra);
+    const adicional = barra.majoracao?.adicionalPercentual ?? 0;
+    const alturaDaBarra = maior > 0 ? (valor / maior) * GRAFICO_ALTURA_UTIL : 0;
+    const x = esquerda + indice * vao + (vao - largura) / 2;
+    const centro = (x + largura / 2).toFixed(2);
+    const rotula = indice % passo === 0;
+    const descricao = `${formatarDataPtBr(barra.periodo.data)} · ${barra.periodo.identificador} · ${pluralizar(barra.ternos, 'terno', 'ternos')} · ${formatarNumero(barra.producao)} ${unidade.abreviacao} · ${barra.majoracao?.descricao ?? 'preço normal'}${barra.custo === undefined ? '' : ` · ${formatarMoeda(barra.custo)}`}`;
+    return `<rect class="chart-bar${adicional > 0 ? ' is-majorado' : ''}${barra.ternos === 0 ? ' is-vazio' : ''}" x="${x.toFixed(2)}" y="${y(valor).toFixed(2)}" width="${largura.toFixed(2)}" height="${alturaDaBarra.toFixed(2)}" rx="3"><title>${escapeHtml(descricao)}</title></rect>
+      <text class="chart-axis-label chart-axis-label-x" x="${centro}" y="${altura - base + 22}">${rotula ? escapeHtml(formatarDataCurtaPtBr(barra.periodo.data)) : ''}</text>
+      <text class="chart-axis-label chart-axis-label-x chart-axis-label-band" x="${centro}" y="${altura - base + 38}">${rotula ? escapeHtml(barra.periodo.identificador) : ''}</text>
+      <text class="chart-ternos-label" x="${centro}" y="${altura - base + 58}">${mostrarTernos ? formatarNumero(barra.ternos) : ''}</text>`;
+  }).join('');
+  const rotuloDaLinhaDeTernos = mostrarTernos
+    ? `<text class="chart-row-label" x="${esquerda - 12}" y="${altura - base + 58}">ternos</text>`
+    : '';
+
+  container.setAttribute('role', 'img');
+  container.setAttribute('aria-label', `Cenário por período. ${pluralizar(barras.length, 'período', 'períodos')}, ${majorados} com adicional de jornada. ${temCusto ? `Custo total ${formatarMoeda(total)}` : `Produção total ${formatarNumero(total)} ${unidade.plural}`}.`);
+  container.innerHTML = `<div class="chart-scroll"><svg class="chart-svg" viewBox="0 0 ${GRAFICO.largura} ${altura}" aria-hidden="true" focusable="false">
+    <text class="chart-axis-title chart-axis-title-y" x="18" y="${topo + GRAFICO_ALTURA_UTIL / 2}" transform="rotate(-90 18 ${topo + GRAFICO_ALTURA_UTIL / 2})">${temCusto ? 'Custo (R$)' : `Produção (${escapeHtml(unidade.abreviacao)})`}</text>
+    ${grade}
+    ${eixos()}
+    ${svgBarras}
+    ${rotuloDaLinhaDeTernos}
+    <text class="chart-axis-title chart-axis-title-x" x="${esquerda + GRAFICO_LARGURA_UTIL / 2}" y="${altura - 12}">Períodos da operação</text>
+  </svg></div>
+  <ul class="chart-legend">
+    <li><span class="chart-swatch chart-swatch-normal" aria-hidden="true"></span>Preço normal</li>
+    <li><span class="chart-swatch chart-swatch-majorado" aria-hidden="true"></span>Com adicional de jornada · ${majorados} de ${barras.length}</li>
+  </ul>`;
+}
+
 function renderPeriodCostChart(resultado: ResultadoDeSimulacao): void {
   const container = document.querySelector<HTMLDivElement>('#period-cost-chart-body');
   const summary = document.querySelector<HTMLElement>('#period-cost-chart-summary');
   if (!container || !summary) return;
-  const custos = resultado.periodos.map((periodo) => periodo.custo.total);
-  const maiorCusto = Math.max(...custos, 0);
-  const media = custos.length ? custos.reduce((total, custo) => total + custo, 0) / custos.length : 0;
-  const majorados = resultado.periodos.filter((periodo) => (periodo.custo.majoracao?.adicionalPercentual ?? 0) > 0).length;
-  summary.textContent = `${pluralizar(resultado.periodos.length, 'período', 'períodos')} · média ${formatarMoeda(media)}`;
-  const { esquerda, topo, altura, base } = GRAFICO;
-  const y = (valor: number) => topo + GRAFICO_ALTURA_UTIL - (maiorCusto > 0 ? valor / maiorCusto : 0) * GRAFICO_ALTURA_UTIL;
-  const divisoes = 4;
-  const grade = gradeHorizontal(y, Array.from({ length: divisoes + 1 }, (_, indice) => (maiorCusto / divisoes) * indice));
-  const vaoDaBarra = resultado.periodos.length ? GRAFICO_LARGURA_UTIL / resultado.periodos.length : GRAFICO_LARGURA_UTIL;
-  const larguraDaBarra = Math.max(4, Math.min(34, vaoDaBarra * .62));
-  const passo = passoDeRotulos(resultado.periodos.length);
-  const barras = resultado.periodos.map((periodo, indice) => {
-    const custo = periodo.custo.total;
-    const adicional = periodo.custo.majoracao?.adicionalPercentual ?? 0;
-    const alturaDaBarra = maiorCusto > 0 ? (custo / maiorCusto) * GRAFICO_ALTURA_UTIL : 0;
-    const x = esquerda + indice * vaoDaBarra + (vaoDaBarra - larguraDaBarra) / 2;
-    const rotulo = indice % passo === 0 ? formatarDataCurtaPtBr(periodo.periodo.data) : '';
-    const descricao = `${periodo.periodo.identificador} · ${formatarDataPtBr(periodo.periodo.data)} · ${periodo.custo.majoracao?.descricao ?? 'preço normal'} · ${formatarMoeda(custo)}`;
-    return `<rect class="chart-bar${adicional > 0 ? ' is-majorado' : ''}" x="${x.toFixed(2)}" y="${y(custo).toFixed(2)}" width="${larguraDaBarra.toFixed(2)}" height="${alturaDaBarra.toFixed(2)}" rx="3"><title>${escapeHtml(descricao)}</title></rect>
-      <text class="chart-axis-label chart-axis-label-x" x="${(x + larguraDaBarra / 2).toFixed(2)}" y="${altura - base + 22}">${rotulo}</text>
-      <text class="chart-axis-label chart-axis-label-x chart-axis-label-band" x="${(x + larguraDaBarra / 2).toFixed(2)}" y="${altura - base + 38}">${indice % passo === 0 ? escapeHtml(periodo.periodo.identificador) : ''}</text>`;
-  }).join('');
-  container.setAttribute('role', 'img');
-  container.setAttribute('aria-label', `Custo por período. Maior custo ${formatarMoeda(maiorCusto)}, média ${formatarMoeda(media)}. ${majorados} de ${resultado.periodos.length} períodos com adicional de jornada.`);
-  container.innerHTML = `<svg class="chart-svg" viewBox="0 0 ${GRAFICO.largura} ${altura}" aria-hidden="true" focusable="false">
-    <text class="chart-axis-title chart-axis-title-y" x="18" y="${topo + GRAFICO_ALTURA_UTIL / 2}" transform="rotate(-90 18 ${topo + GRAFICO_ALTURA_UTIL / 2})">Custo (R$)</text>
-    ${grade}
-    ${eixos()}
-    ${barras}
-    <text class="chart-axis-title chart-axis-title-x" x="${esquerda + GRAFICO_LARGURA_UTIL / 2}" y="${altura - 10}">Períodos da operação</text>
-  </svg>
-  <ul class="chart-legend">
-    <li><span class="chart-swatch chart-swatch-normal" aria-hidden="true"></span>Preço normal</li>
-    <li><span class="chart-swatch chart-swatch-majorado" aria-hidden="true"></span>Com adicional de jornada · ${majorados} de ${resultado.periodos.length}</li>
-  </ul>`;
+  const unidade = rotuloDaUnidade(catalogoPortmac.obterFaina(resultado.entrada.faina)?.unidade);
+  const barras: BarraDoCenario[] = resultado.periodos.map((periodo) => ({
+    periodo: periodo.periodo,
+    producao: periodo.producaoToneladas,
+    ternos: periodo.ternos,
+    majoracao: periodo.custo.majoracao,
+    custo: periodo.custo.total,
+  }));
+  const media = barras.length ? resultado.custoDeMaoDeObra / barras.length : 0;
+  summary.textContent = `${pluralizar(barras.length, 'período', 'períodos')} · ${pluralizar(resultado.entrada.totalDeTernos, 'terno', 'ternos')} · média ${formatarMoeda(media)}`;
+  renderScenarioChart(container, barras, unidade);
 }
 
 function formatarValorEixo(value: number): string {
   if (value >= 1000) return `R$ ${formatarNumero(value / 1000, 1)} mil`;
   return `R$ ${formatarNumero(value, 0)}`;
 }
-
-function obterAnaliseDeSensibilidade(resultado: ResultadoDeSimulacao): AnaliseDeSensibilidade {
-  const baseEntrada: EntradaDeSimulacao = {
-    ...(resultado.entrada.cliente ? { cliente: resultado.entrada.cliente } : {}),
-    ...(resultado.entrada.custosOpcionais?.length ? { custosOpcionais: resultado.entrada.custosOpcionais } : {}),
-    faina: resultado.entrada.faina,
-    inicio: resultado.entrada.inicio,
-    volumeToneladas: resultado.entrada.volumeToneladas,
-    produtividadeToneladasPorPeriodo: resultado.entrada.produtividadeToneladasPorPeriodo,
-    ...(resultado.entrada.ternosPorPeriodoPadrao ? { ternosPorPeriodoPadrao: resultado.entrada.ternosPorPeriodoPadrao } : {}),
-    totalDeTernos: resultado.entrada.totalDeTernos,
-  };
-  const produtividades = gerarGradeDeProdutividades(baseEntrada, resultado.quantidadeDePeriodos);
-  const otimizacao = otimizarCenario(baseEntrada, catalogoPortmac, calendarioOperacional, produtividades);
-  const pontos = otimizacao.candidatos.map((candidato) => ({
-    produtividade: candidato.produtividade,
-    custoPorTonelada: candidato.resultado.custoPorTonelada,
-    periodos: candidato.periodos,
-  }));
-  const produtividadeBase = baseEntrada.produtividadeToneladasPorPeriodo;
-  const candidatoAtual = produtividadeBase > 0 && pontos.some((ponto) => ponto.produtividade === produtividadeBase)
-    ? undefined
-    : {
-      produtividade: produtividadeBase,
-      custoPorTonelada: resultado.custoPorTonelada,
-      periodos: resultado.quantidadeDePeriodos,
-      ehCenarioAtual: true,
-    };
-  return {
-    pontos: candidatoAtual ? [...pontos, candidatoAtual].sort((a, b) => a.produtividade - b.produtividade) : pontos,
-    otimizacao,
-  };
-}
-
-function renderProductivitySensitivity(resultado: ResultadoDeSimulacao): void {
-  const container = document.querySelector<HTMLDivElement>('#productivity-sensitivity-body');
-  const summary = document.querySelector<HTMLElement>('#productivity-sensitivity-summary');
-  if (!container) return;
-  const analise = obterAnaliseDeSensibilidade(resultado);
-  const base = resultado.entrada.produtividadeToneladasPorPeriodo;
-  const candidatos = analise.pontos.filter((ponto) => !ponto.ehCenarioAtual);
-  const unidade = rotuloDaUnidade(catalogoPortmac.obterFaina(resultado.entrada.faina)?.unidade);
-  const pontoOtimo = analise.otimizacao.melhor;
-  if (candidatos.length < 2 || !pontoOtimo) {
-    if (summary) summary.textContent = 'comparação indisponível';
-    container.removeAttribute('role');
-    container.innerHTML = '<p class="sensitivity-empty">Esta operação não gera cenários comparativos suficientes: com o volume e os ternos informados só existe uma configuração viável.</p>';
-    return;
-  }
-  const pontoBase = analise.pontos.find((ponto) => ponto.ehCenarioAtual)
-    ?? candidatos.find((ponto) => ponto.produtividade === base);
-  const periodosVarridos = candidatos.map((ponto) => ponto.periodos);
-  if (summary) {
-    // A grade é limitada; dizer até onde ela foi evita ler um ótimo de borda
-    // como se fosse o mínimo global da operação.
-    summary.textContent = `Ótimo: ${pluralizar(pontoOtimo.periodos, 'período', 'períodos')} · ${formatarNumero(pontoOtimo.produtividade)} ${unidade.abreviacao}/terno/período · ${formatarMoeda(pontoOtimo.resultado.custoPorTonelada)} por ${unidade.singular} · varredura de ${formatarNumero(Math.min(...periodosVarridos))} a ${formatarNumero(Math.max(...periodosVarridos))} períodos`;
-  }
-
-  // O eixo X mede períodos, não produtividade. A produtividade de cada
-  // candidato é `volume ÷ (k × ternos)`: em escala linear os candidatos se
-  // amontoam à esquerda e os rótulos viram um borrão. Períodos são o que o
-  // operador de fato escolhe e distribuem-se por igual; a produtividade
-  // correspondente continua no tooltip e na tabela.
-  const plotados = [...analise.pontos].sort((a, b) => a.periodos - b.periodos);
-  const xMin = Math.min(...plotados.map((ponto) => ponto.periodos));
-  const xMax = Math.max(...plotados.map((ponto) => ponto.periodos));
-  const custos = plotados.map((ponto) => ponto.custoPorTonelada);
-  const menorCusto = Math.min(...custos);
-  const maiorCusto = Math.max(...custos);
-  const folga = Math.max((maiorCusto - menorCusto) * .16, maiorCusto * .04, .5);
-  const yMin = Math.max(0, menorCusto - folga);
-  const yMax = maiorCusto + folga;
-  const { esquerda, topo, altura, base: margemInferior } = GRAFICO;
-  const x = (valor: number) => xMax === xMin
-    ? esquerda + GRAFICO_LARGURA_UTIL / 2
-    : esquerda + ((valor - xMin) / (xMax - xMin)) * GRAFICO_LARGURA_UTIL;
-  const y = (valor: number) => yMax === yMin
-    ? topo + GRAFICO_ALTURA_UTIL / 2
-    : topo + GRAFICO_ALTURA_UTIL - ((valor - yMin) / (yMax - yMin)) * GRAFICO_ALTURA_UTIL;
-  const grade = gradeHorizontal(y, Array.from({ length: 5 }, (_, indice) => yMin + ((yMax - yMin) / 4) * indice));
-  const ordenados = [...candidatos].sort((a, b) => a.periodos - b.periodos);
-  const linha = ordenados
-    .map((ponto, indice) => `${indice === 0 ? 'M' : 'L'} ${x(ponto.periodos).toFixed(2)} ${y(ponto.custoPorTonelada).toFixed(2)}`)
-    .join(' ');
-  // O ótimo costuma cair no extremo do eixo; o rótulo recua para dentro da
-  // área de plotagem para não sair do gráfico nem colidir com o eixo Y.
-  const xDoOtimo = x(pontoOtimo.periodos);
-  const xDoRotulo = Math.min(Math.max(xDoOtimo, esquerda + 22), esquerda + GRAFICO_LARGURA_UTIL - 22);
-  const guiaDoOtimo = `<line class="sensitivity-optimal-guide" x1="${xDoOtimo.toFixed(2)}" y1="${topo}" x2="${xDoOtimo.toFixed(2)}" y2="${topo + GRAFICO_ALTURA_UTIL}" /><text class="sensitivity-optimal-guide-label" x="${xDoRotulo.toFixed(2)}" y="${topo - 10}">ótimo</text>`;
-  const passo = passoDeRotulos(ordenados.length, 9);
-  const marcadores = ordenados.map((ponto, indice) => {
-    const ehOtimo = ponto.produtividade === pontoOtimo.produtividade;
-    const descricao = `${pluralizar(ponto.periodos, 'período', 'períodos')} · ${formatarNumero(ponto.produtividade)} ${unidade.abreviacao}/terno/período · ${formatarMoeda(ponto.custoPorTonelada)} por ${unidade.singular}`;
-    return `<circle class="sensitivity-point${ehOtimo ? ' is-optimal' : ''}" cx="${x(ponto.periodos).toFixed(2)}" cy="${y(ponto.custoPorTonelada).toFixed(2)}" r="${ehOtimo ? 7 : 4}"><title>${escapeHtml(descricao)}</title></circle>
-      <text class="chart-axis-label chart-axis-label-x" x="${x(ponto.periodos).toFixed(2)}" y="${altura - margemInferior + 22}">${indice % passo === 0 ? escapeHtml(formatarNumero(ponto.periodos)) : ''}</text>`;
-  }).join('');
-  const marcadorDaBase = pontoBase
-    ? `<circle class="sensitivity-point is-base" cx="${x(pontoBase.periodos).toFixed(2)}" cy="${y(pontoBase.custoPorTonelada).toFixed(2)}" r="7"><title>Cenário informado · ${pluralizar(pontoBase.periodos, 'período', 'períodos')} · ${formatarNumero(pontoBase.produtividade)} ${unidade.abreviacao}/terno/período · ${formatarMoeda(pontoBase.custoPorTonelada)} por ${unidade.singular}</title></circle>
-      <text class="sensitivity-base-marker-label" x="${x(pontoBase.periodos).toFixed(2)}" y="${(y(pontoBase.custoPorTonelada) - 14).toFixed(2)}">cenário</text>`
-    : '';
-  const pontosDaTabela = plotados.filter((ponto, indice) =>
-    indice % passoDeRotulos(plotados.length, 14) === 0
-    || ponto.produtividade === base
-    || ponto.produtividade === pontoOtimo.produtividade);
-  container.setAttribute('role', 'img');
-  container.setAttribute('aria-label', `Sensibilidade à produtividade. O custo por ${unidade.singular} varia de ${formatarMoeda(menorCusto)} a ${formatarMoeda(maiorCusto)}; o menor custo aparece em ${formatarNumero(pontoOtimo.produtividade)} ${unidade.abreviacao} por terno por período, com ${pluralizar(pontoOtimo.periodos, 'período', 'períodos')}.`);
-  container.innerHTML = `<svg class="chart-svg sensitivity-chart-svg" viewBox="0 0 ${GRAFICO.largura} ${altura}" aria-hidden="true" focusable="false">
-    <text class="chart-axis-title chart-axis-title-y" x="18" y="${topo + GRAFICO_ALTURA_UTIL / 2}" transform="rotate(-90 18 ${topo + GRAFICO_ALTURA_UTIL / 2})">Custo por ${escapeHtml(unidade.singular)} (R$)</text>
-    ${grade}
-    ${eixos()}
-    ${guiaDoOtimo}
-    <path class="sensitivity-line" d="${linha}" />
-    ${marcadores}
-    ${marcadorDaBase}
-    <text class="chart-axis-title chart-axis-title-x" x="${esquerda + GRAFICO_LARGURA_UTIL / 2}" y="${altura - 10}">Períodos da operação · produtividade correspondente na tabela</text>
-  </svg>
-  <ul class="chart-legend">
-    <li><span class="chart-swatch chart-swatch-base" aria-hidden="true"></span>Cenário informado</li>
-    <li><span class="chart-swatch chart-swatch-optimal" aria-hidden="true"></span>Menor custo por ${escapeHtml(unidade.singular)}</li>
-  </ul>
-  <div class="sensitivity-table-wrap"><table class="sensitivity-table"><thead><tr><th>Períodos</th><th>Produtividade / terno / período</th><th>Custo por ${escapeHtml(unidade.singular)}</th></tr></thead><tbody>
-    ${pontosDaTabela.map((ponto) => {
-      const ehBase = ponto.produtividade === base;
-      const ehOtimo = ponto.produtividade === pontoOtimo.produtividade;
-      return `<tr class="${ehBase ? 'is-base' : ''}${ehOtimo ? ' is-optimal' : ''}"><td>${formatarNumero(ponto.periodos)}${ehBase ? ' <span class="sensitivity-base-label">cenário</span>' : ''}${ehOtimo ? ' <span class="sensitivity-optimal-label">ótimo</span>' : ''}</td><td>${formatarNumero(ponto.produtividade)} ${escapeHtml(unidade.abreviacao)}</td><td>${formatarMoeda(ponto.custoPorTonelada)}</td></tr>`;
-    }).join('')}
-  </tbody></table></div>`;
-}
-
 function saveCurrentBudget(): void {
   if (!currentResult) return;
   const cliente = currentResult.entrada.cliente?.trim();
@@ -736,10 +662,6 @@ function printSavedBudget(id?: string): void {
   if (!budget) return;
   const faina = catalogoPortmac.obterFaina(budget.resultado.entrada.faina);
   const unidade = rotuloDaUnidade(faina?.unidade);
-  const analise = obterAnaliseDeSensibilidade(budget.resultado);
-  const sensibilidade = analise.pontos;
-  const produtividadeBase = budget.resultado.entrada.produtividadeToneladasPorPeriodo;
-  const pontoOtimo = analise.otimizacao.melhor;
   const report = document.createElement('section');
   report.className = 'print-report';
   report.innerHTML = `<header class="print-report-header">
@@ -762,7 +684,6 @@ function printSavedBudget(id?: string): void {
   <section class="print-report-section"><h2>Composição por período</h2><div class="saved-period-table-wrap"><table class="saved-period-table"><thead><tr><th>Data</th><th>Período</th><th>Produtividade / terno</th><th>Produção</th><th>Ternos</th><th>Majoração</th><th>Custo</th></tr></thead><tbody>
     ${budget.resultado.periodos.map((periodo, indice) => `<tr><td>${formatarDataPtBr(periodo.periodo.data)}</td><td>${escapeHtml(periodo.periodo.identificador)}</td><td>${formatarNumero(budget.resultado.entrada.produtividadesPorPeriodo?.[indice] ?? budget.resultado.entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/terno</td><td>${formatarNumero(periodo.producaoToneladas)} ${unidade.abreviacao}</td><td>${formatarNumero(periodo.ternos)}</td><td>${escapeHtml(periodo.custo.majoracao?.descricao ?? 'preço normal')}</td><td>${formatarMoeda(periodo.custo.total)}</td></tr>`).join('')}
   </tbody></table></div></section>
-  <section class="print-report-section"><h2>Sensibilidade à produtividade</h2><p class="print-report-note">Custo por ${escapeHtml(unidade.singular)} em cada duração possível da mesma operação${pontoOtimo ? ` · menor custo em ${pluralizar(pontoOtimo.periodos, 'período', 'períodos')}, o que exigiria ${formatarNumero(pontoOtimo.produtividade)} ${unidade.abreviacao}/terno/período` : ''}. A grade não considera limite físico de produtividade.</p><div class="print-memory">${[...sensibilidade].sort((a, b) => a.periodos - b.periodos).map((ponto) => `<div><span>${pluralizar(ponto.periodos, 'período', 'períodos')} · ${formatarNumero(ponto.produtividade)} ${unidade.abreviacao}/terno/período${ponto.produtividade === produtividadeBase ? ' · cenário informado' : ''}${pontoOtimo && ponto.produtividade === pontoOtimo.produtividade ? ' · ótimo' : ''}</span><strong>${formatarMoeda(ponto.custoPorTonelada)}</strong></div>`).join('')}</div></section>
   <section class="print-report-section"><h2>Memória por período</h2><div class="print-period-memory">
     ${budget.resultado.periodos.map((periodo) => `<div class="print-period-memory-block"><h3>${formatarDataPtBr(periodo.periodo.data)} · ${escapeHtml(periodo.periodo.identificador)} · ${formatarMoeda(periodo.custo.total)}</h3>${periodo.custo.memoria.map((linha) => `<div><span>${escapeHtml(linha.descricao)}</span><strong>${formatarMoeda(linha.valor)}</strong></div>`).join('')}</div>`).join('')}
   </div></section>
@@ -798,6 +719,24 @@ function formatarDataHora(value: string): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+let quadroDeAjusteAgendado = 0;
+
+/**
+ * Coalesce os ajustes do editor em um redesenho por quadro.
+ *
+ * Um arrasto de slider dispara dezenas de eventos por segundo e cada um
+ * recalcula o custo de todos os períodos: em uma operação longa isso derrubava
+ * a resposta a ~22 quadros por segundo. Só o último estado de cada quadro
+ * interessa.
+ */
+function agendarAjusteDosPeriodos(): void {
+  if (quadroDeAjusteAgendado) return;
+  quadroDeAjusteAgendado = requestAnimationFrame(() => {
+    quadroDeAjusteAgendado = 0;
+    applyPeriodDetails();
+  });
+}
+
 function applyPeriodDetails(): void {
   const ternos = Array.from(ternosEditorBody.querySelectorAll<HTMLInputElement>('.ternos-input')).map((input) => Number(input.value));
   const produtividades = Array.from(ternosEditorBody.querySelectorAll<HTMLInputElement>('.productivity-period-input')).map((input) => Number(input.value));
@@ -807,6 +746,9 @@ function applyPeriodDetails(): void {
   draftDistribution = ternos;
   draftProductivities = produtividades;
   renderDistributionTotals(produtividades, ternos);
+  // O gráfico é redesenhado antes das validações: é justamente durante um
+  // ajuste, com a soma dos ternos fora do total, que ele precisa acompanhar.
+  renderEditorChart(periodosDoRascunho(), produtividades, ternos);
   if (ternos.some((value) => !Number.isInteger(value) || value < 0 || value > 4)) {
     showDistributionError('Cada período deve ter entre 0 e 4 ternos.');
     return;
@@ -866,10 +808,12 @@ function renderTernosEditor(resultado?: ResultadoDeSimulacao): void {
     : 'total de ternos pendente';
   setText('#ternos-editor-count', `${periodos.length} ${periodos.length === 1 ? 'período' : 'períodos'} · ${totalTernosLabel}`);
   renderDistributionTotals(draftProductivities, draftDistribution);
+  periodosDoEditor = periodos;
   if (!periodos.length) {
     ternosEditorStatus.textContent = 'Informe volume, produtividade e data válidos para detalhar os períodos.';
     ternosEditorStatus.hidden = false;
     ternosEditorBody.innerHTML = '';
+    renderEditorChart([], [], []);
     return;
   }
   const excedeLimite = totalTernos > periodos.length * 4;
@@ -877,50 +821,112 @@ function renderTernosEditor(resultado?: ResultadoDeSimulacao): void {
     ? `O máximo é ${periodos.length * 4} ternos para ${pluralizar(periodos.length, 'período', 'períodos')}.`
     : '';
   ternosEditorStatus.hidden = !excedeLimite;
-  const faina = catalogoPortmac.obterFaina(fainaCodeInput.value);
-  const unidade = rotuloDaUnidade(faina?.unidade);
-  ternosEditorBody.innerHTML = periodos.map((periodo, indice) => {
-    const calculado = resultado?.periodos[indice];
-    const ternos = draftDistribution[indice] ?? 0;
-    const produtividade = draftProductivities[indice] ?? produtividadeBase;
-    return `
+  const unidade = rotuloDaUnidade(catalogoPortmac.obterFaina(fainaCodeInput.value)?.unidade);
+  // A tabela só é reconstruída quando a própria sequência de períodos muda.
+  // Trocar o innerHTML a cada ajuste destruía o slider sob o cursor e matava o
+  // arrasto no instante em que a distribuição voltava a fechar.
+  const chave = periodos.map((periodo) => `${formatarData(periodo.data)}#${periodo.identificador}`).join('|');
+  if (chave !== chaveDosPeriodosDoEditor || ternosEditorBody.rows.length !== periodos.length) {
+    chaveDosPeriodosDoEditor = chave;
+    construirLinhasDoEditor(periodos, unidade, excedeLimite);
+  }
+  atualizarLinhasDoEditor(periodos, excedeLimite, resultado);
+  renderEditorChart(periodos, draftProductivities, draftDistribution);
+}
+
+function construirLinhasDoEditor(
+  periodos: readonly PeriodoOgmo[],
+  unidade: ReturnType<typeof rotuloDaUnidade>,
+  excedeLimite: boolean,
+): void {
+  ternosEditorBody.innerHTML = periodos.map((periodo) => `
       <tr>
         <td>${escapeHtml(periodo.identificador)}</td>
         <td>${formatarDataPtBr(periodo.data)}</td>
         <td>
           <label class="period-productivity-control">
-            <input class="productivity-period-input" data-period-index="${periodo.indice}" type="number" min="0.01" step="0.01" value="${produtividade}" aria-label="Produtividade no ${periodo.identificador}" />
-            <span>${unidade.abreviacao} / terno / período</span>
+            <input class="productivity-period-input" id="produtividade-${periodo.indice}" data-period-index="${periodo.indice}" type="number" min="0.01" step="0.01" aria-label="Produtividade no ${escapeHtml(periodo.identificador)} de ${formatarDataPtBr(periodo.data)}" />
+            <span>${escapeHtml(unidade.abreviacao)} / terno / período</span>
           </label>
         </td>
         <td>
           <div class="ternos-control">
-            <input class="ternos-input" data-period-index="${periodo.indice}" type="range" min="0" max="4" step="1" value="${Math.min(4, Math.max(0, ternos))}" aria-label="Ternos no ${periodo.identificador}" ${excedeLimite ? 'disabled' : ''} />
-            <output class="ternos-value" for="ternos-${periodo.indice}">${Math.min(4, Math.max(0, ternos))}</output>
+            <input class="ternos-input" id="ternos-${periodo.indice}" data-period-index="${periodo.indice}" type="range" min="0" max="4" step="1" aria-label="Ternos no ${escapeHtml(periodo.identificador)} de ${formatarDataPtBr(periodo.data)}" ${excedeLimite ? 'disabled' : ''} />
+            <output class="ternos-value" for="ternos-${periodo.indice}"></output>
           </div>
         </td>
-        <td class="period-premium-cell">
-          ${calculado ? `<span class="period-premium">${escapeHtml(calculado.custo.majoracao?.descricao ?? 'dia normal · preço normal')}</span><small>tabela ${escapeHtml(calculado.custo.majoracao?.fonte ?? 'ACT')}</small>` : '<span class="period-pending">a calcular</span>'}
-        </td>
-        <td>${calculado ? formatarMoeda(calculado.custo.total) : '—'}</td>
+        <td class="period-premium-cell"></td>
+        <td></td>
       </tr>
-    `;
-  }).join('');
+    `).join('');
 
   ternosEditorBody.querySelectorAll<HTMLInputElement>('.ternos-input').forEach((input) => {
-    input.id = `ternos-${input.dataset.periodIndex}`;
     input.addEventListener('input', () => {
-      const value = input.closest('.ternos-control')?.querySelector<HTMLOutputElement>('.ternos-value');
-      if (value) {
-        value.value = input.value;
-        value.textContent = input.value;
+      const saida = input.closest('.ternos-control')?.querySelector<HTMLOutputElement>('.ternos-value');
+      if (saida) {
+        saida.value = input.value;
+        saida.textContent = input.value;
       }
-      applyPeriodDetails();
+      agendarAjusteDosPeriodos();
     });
   });
   ternosEditorBody.querySelectorAll<HTMLInputElement>('.productivity-period-input').forEach((input) => {
-    input.addEventListener('input', () => applyPeriodDetails());
+    input.addEventListener('input', () => agendarAjusteDosPeriodos());
   });
+}
+
+/**
+ * Escreve nas linhas existentes os valores do rascunho e o que o cálculo já
+ * sabe. Um campo em foco nunca é sobrescrito: é o campo que o usuário está
+ * mexendo agora.
+ */
+function atualizarLinhasDoEditor(
+  periodos: readonly PeriodoOgmo[],
+  excedeLimite: boolean,
+  resultado?: ResultadoDeSimulacao,
+): void {
+  const produtividadeBase = numberOf('#produtividade');
+  periodos.forEach((periodo, indice) => {
+    const linha = ternosEditorBody.rows[indice];
+    if (!linha) return;
+    const ternos = Math.min(4, Math.max(0, draftDistribution[indice] ?? 0));
+    const produtividade = draftProductivities[indice] ?? produtividadeBase;
+
+    const campoProdutividade = linha.querySelector<HTMLInputElement>('.productivity-period-input');
+    if (campoProdutividade && campoProdutividade !== document.activeElement) {
+      const texto = Number.isFinite(produtividade) ? String(produtividade) : '';
+      if (campoProdutividade.value !== texto) campoProdutividade.value = texto;
+    }
+
+    const campoTernos = linha.querySelector<HTMLInputElement>('.ternos-input');
+    if (campoTernos) {
+      campoTernos.disabled = excedeLimite;
+      if (campoTernos !== document.activeElement && campoTernos.value !== String(ternos)) {
+        campoTernos.value = String(ternos);
+      }
+    }
+    const saida = linha.querySelector<HTMLOutputElement>('.ternos-value');
+    if (saida) {
+      const valor = campoTernos?.value ?? String(ternos);
+      saida.value = valor;
+      saida.textContent = valor;
+    }
+
+    const calculado = resultado?.periodos[indice];
+    const celulaMajoracao = linha.querySelector<HTMLElement>('.period-premium-cell');
+    if (celulaMajoracao) {
+      celulaMajoracao.innerHTML = calculado
+        ? `<span class="period-premium">${escapeHtml(calculado.custo.majoracao?.descricao ?? 'dia normal · preço normal')}</span><small>tabela ${escapeHtml(calculado.custo.majoracao?.fonte ?? 'ACT')}</small>`
+        : '<span class="period-pending">a calcular</span>';
+    }
+    const celulaCusto = linha.cells[linha.cells.length - 1];
+    if (celulaCusto) celulaCusto.textContent = calculado ? formatarMoeda(calculado.custo.total) : '—';
+  });
+}
+
+/** Períodos que o editor está exibindo agora, sem reprojetar o calendário. */
+function periodosDoRascunho(): readonly PeriodoOgmo[] {
+  return periodosDoEditor;
 }
 
 function updateTernosPreview(): void {
@@ -971,22 +977,100 @@ function renderDistributionTotals(
   ternosEditorTernosTotal.parentElement?.classList.toggle('is-valid', totalTernos === totalTernosEsperado);
 }
 
+/**
+ * Produção de cada período, na mesma ordem em que o simulador a distribui:
+ * capacidade do período limitada pelo que ainda resta do navio.
+ */
+function producoesPorPeriodo(
+  produtividades: readonly number[],
+  ternos: readonly number[],
+): number[] {
+  let restante = numberOf('#volume');
+  return produtividades.map((produtividade, indice) => {
+    const quantidadeDeTernos = ternos[indice] ?? Number.NaN;
+    if (
+      !Number.isFinite(produtividade) || produtividade <= 0
+      || !Number.isFinite(quantidadeDeTernos) || quantidadeDeTernos < 0
+    ) return 0;
+    const producao = Math.min(produtividade * quantidadeDeTernos, Math.max(0, restante));
+    restante -= producao;
+    return producao;
+  });
+}
+
 function volumeDistribuidoPorPeriodos(
   produtividades: readonly number[],
   ternos: readonly number[],
 ): number {
-  let restante = numberOf('#volume');
-  let total = 0;
-  produtividades.forEach((produtividade, indice) => {
-    if (!Number.isFinite(produtividade) || produtividade <= 0) return;
-    const quantidadeDeTernos = ternos[indice] ?? Number.NaN;
-    if (!Number.isFinite(quantidadeDeTernos) || quantidadeDeTernos < 0) return;
-    const capacidade = produtividade * quantidadeDeTernos;
-    const producao = Math.min(capacidade, Math.max(0, restante));
-    total += producao;
-    restante -= producao;
+  return producoesPorPeriodo(produtividades, ternos).reduce((soma, producao) => soma + producao, 0);
+}
+
+/**
+ * Custo do rascunho, período a período, sem passar pelo `simular`.
+ *
+ * O gráfico ao vivo precisa responder no meio de um ajuste — quando a soma dos
+ * ternos ainda não fecha e a simulação recusaria a entrada. O catálogo calcula
+ * um período isolado sem exigir que a operação inteira esteja consistente.
+ */
+function montarBarrasDoRascunho(
+  periodos: readonly PeriodoOgmo[],
+  produtividades: readonly number[],
+  ternos: readonly number[],
+): BarraDoCenario[] {
+  const faina = catalogoPortmac.obterFaina(fainaCodeInput.value);
+  const producoes = producoesPorPeriodo(produtividades, ternos);
+  return periodos.map((periodo, indice) => {
+    const producao = producoes[indice] ?? 0;
+    const ternosDoPeriodo = ternos[indice] ?? 0;
+    const majoracao = faina ? majoracaoDoPeriodoProjetado(periodo, faina.fonte) : undefined;
+    let custo: number | undefined;
+    if (faina) {
+      try {
+        custo = catalogoPortmac.calcularCustoDoPeriodo({
+          faina,
+          periodo,
+          producaoToneladas: producao,
+          ternos: ternosDoPeriodo,
+          ...(majoracao ? { majoracao } : {}),
+        }).total;
+      } catch {
+        // Faina sem regra habilitada: o gráfico cai para produção no eixo.
+        custo = undefined;
+      }
+    }
+    return { periodo, producao, ternos: ternosDoPeriodo, majoracao, custo };
   });
-  return total;
+}
+
+/** Redesenha o gráfico do editor a cada ajuste, válido o rascunho ou não. */
+function renderEditorChart(
+  periodos: readonly PeriodoOgmo[],
+  produtividades: readonly number[],
+  ternos: readonly number[],
+): void {
+  const container = document.querySelector<HTMLDivElement>('#editor-chart-body');
+  const summary = document.querySelector<HTMLElement>('#editor-chart-summary');
+  const wrapper = document.querySelector<HTMLElement>('#editor-chart');
+  if (!container || !summary || !wrapper) return;
+  const pronto = periodos.length > 0 && produtividades.length === periodos.length && ternos.length === periodos.length;
+  wrapper.hidden = !pronto;
+  if (!pronto) {
+    renderScenarioChart(container, [], rotuloDaUnidade());
+    return;
+  }
+  const unidade = rotuloDaUnidade(catalogoPortmac.obterFaina(fainaCodeInput.value)?.unidade);
+  const barras = montarBarrasDoRascunho(periodos, produtividades, ternos);
+  const custoDoRascunho = barras.reduce((soma, barra) => soma + (barra.custo ?? 0), 0);
+  const temCusto = barras.every((barra) => barra.custo !== undefined);
+  const ternosDistribuidos = ternos.reduce((soma, valor) => soma + (Number.isFinite(valor) ? valor : 0), 0);
+  // Um período com terno alocado e produção zero é capacidade requisitada que
+  // não move carga — a barra some do gráfico, então o aviso vai no resumo.
+  const ociosos = barras.filter((barra) => barra.ternos > 0 && barra.producao <= 0).length;
+  const aviso = ociosos ? ` · ${pluralizar(ociosos, 'período sem produção', 'períodos sem produção')}` : '';
+  summary.textContent = temCusto
+    ? `Mão de obra do rascunho ${formatarMoeda(custoDoRascunho)} · ${pluralizar(ternosDistribuidos, 'terno', 'ternos')}${aviso}`
+    : `${pluralizar(ternosDistribuidos, 'terno', 'ternos')} distribuídos${aviso}`;
+  renderScenarioChart(container, barras, unidade);
 }
 
 function renderFainaOptions(): void {

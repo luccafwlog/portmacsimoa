@@ -41,10 +41,14 @@ o custo final nem uma previsão automática da operação.
 ## Fluxo decidido
 
 1. O usuário informa opcionalmente o cliente e informa faina, data e período de
-   início, volume, produtividade e ternos por período. O total de ternos é
-   calculado automaticamente.
-2. O núcleo calcula `ceil(volume / (produtividade × ternos por período))`
-   períodos.
+   início. O cenário em si tem três entradas: **volume do navio**,
+   **produtividade por terno por período** e **ternos por período**. Tudo o
+   mais — quantidade de períodos e total de ternos — é derivado delas.
+2. O núcleo calcula `ceil(volume ÷ produtividade ÷ ternos por período)`
+   períodos, e o total de ternos da operação é `períodos × ternos por período`.
+   Exemplo: 19.500 toneladas a 750 t por terno por período com 2 ternos dão
+   13 períodos e 26 ternos no total. Aumentar os ternos por período encurta a
+   operação; reduzi-los a alonga.
 3. A partir da data e da faixa inicial, o calendário avança quatro períodos por
    dia e informa a data de início de cada período.
 4. O volume é distribuído pela capacidade de cada período (`produtividade por
@@ -62,21 +66,16 @@ o custo final nem uma previsão automática da operação.
    das planilhas ACT/CCT são provisórias e calculam um terno completo.
 7. O resultado mostra custo total, custo por unidade e memória simples por
    período. O custo final soma a mão de obra aos custos opcionais informados.
-8. A sensibilidade à produtividade compara uma grade derivada da operação e
-   independente da produtividade informada. Cada candidato responde a "e se a
-   operação fechasse em `k` períodos?", com produtividade
-   `volume ÷ (k × ternos por período)` arredondada para cima; a grade varre de
-   1 período até o dobro dos períodos do cenário, com mínimo de 24 e teto de
-   96. Para cada candidato, o núcleo recalcula os períodos, redistribui os
-   ternos e executa o mesmo motor de custos. O ótimo é o menor custo por
-   unidade entre os candidatos viáveis; a produtividade-base serve apenas para
-   o cenário informado e para dimensionar a largura da varredura.
-   O modelo de custo não tem limite físico de produtividade: nas fainas por
-   produção o custo de mão de obra é proporcional à quantidade movimentada, de
-   modo que só a majoração de jornada distingue os candidatos. O ótimo diz o
-   que a tabela ACT/CCT cobra em cada duração, não o que o berço consegue
-   produzir; a varredura é limitada e seu extremo pode não ser o mínimo global.
-
+8. O detalhamento por períodos é onde o cenário é desenhado: cada período
+   aceita a sua própria produtividade e de 0 a 4 ternos. Um gráfico dentro
+   dessa seção acompanha a edição ao vivo, período a período, com o custo de
+   cada um e a cor separando preço normal de período com adicional de jornada.
+   O rascunho é custeado pelo mesmo catálogo que o motor usa, sem passar pela
+   validação da simulação — é o que permite ver o efeito de um ajuste enquanto
+   a soma dos ternos ainda não fechou. O gráfico do resultado repete esse
+   desenho depois do cálculo, agora sobre o cenário aceito pelo motor.
+   Não existe varredura automática de produtividades: comparar cenários é mover
+   ternos e produtividades e ler o gráfico.
 ## Arquitetura de páginas
 
 - **Nova simulação** é a página principal e concentra a montagem do cenário.
@@ -97,6 +96,11 @@ o custo final nem uma previsão automática da operação.
   ele; nenhum módulo formata `Intl` por conta própria.
 - Cada linha da memória declara se é `MOEDA` ou `QUANTIDADE`. A camada de
   apresentação lê essa marca em vez de adivinhar pela posição da linha.
+- Os dois gráficos de cenário — o do editor e o do resultado — são a mesma
+  função de desenho alimentada por dados diferentes, para que o rascunho e o
+  cálculo nunca divirjam na leitura.
+- `majoracaoDoPeriodoProjetado` é a única regra de majoração por período:
+  o motor a usa para custear e a interface para desenhar o rascunho.
 - `src/styles.css` é uma camada única: os tokens vivem em um único `:root`,
   cada seletor aparece uma vez e as variações por largura ficam nas três
   media queries do fim do arquivo.

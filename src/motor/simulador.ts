@@ -3,9 +3,12 @@ import type { CatalogoOgmo } from '../catalogo/portas.js';
 import type {
   CustoOpcionalCalculado,
   EntradaDeSimulacao,
+  FonteDoCatalogo,
   LinhaDeMemoria,
+  PeriodoOgmo,
   ResultadoDeSimulacao,
 } from '../dominio/tipos.js';
+import type { MajoracaoDoPeriodo } from '../dominio/majoracoes.js';
 import { obterMajoracaoDoPeriodo } from '../dominio/majoracoes.js';
 import { rotuloDaUnidade } from '../dominio/formato.js';
 import { ehFeriadoVilaVelha } from '../calendario/feriados.js';
@@ -22,6 +25,29 @@ export class CatalogoIncompleto extends Error {
     super(mensagem);
     this.name = 'CatalogoIncompleto';
   }
+}
+
+const FAIXAS_COM_MAJORACAO = ['01-07', '07-13', '13-19', '19-01'];
+
+/**
+ * Majoração de um período já projetado pelo calendário.
+ *
+ * Exportada porque a interface precisa da mesma resposta para desenhar o
+ * rascunho do cenário antes de ele fechar as validações da simulação. Duas
+ * cópias da regra divergiriam no primeiro feriado novo.
+ */
+export function majoracaoDoPeriodoProjetado(
+  periodo: PeriodoOgmo,
+  fonte: FonteDoCatalogo,
+): MajoracaoDoPeriodo | undefined {
+  if (!FAIXAS_COM_MAJORACAO.includes(periodo.identificador)) return undefined;
+  const feriado = ehFeriadoVilaVelha(periodo.data);
+  return obterMajoracaoDoPeriodo({
+    data: periodo.data,
+    periodo: periodo.identificador,
+    fonte,
+    ...(feriado ? { feriado: true } : {}),
+  });
 }
 
 export function simular(
@@ -75,15 +101,7 @@ export function simular(
       restante,
     );
     restante -= producaoToneladas;
-    const feriado = ehFeriadoVilaVelha(periodo.data);
-    const majoracao = ['01-07', '07-13', '13-19', '19-01'].includes(periodo.identificador)
-      ? obterMajoracaoDoPeriodo({
-        data: periodo.data,
-        periodo: periodo.identificador,
-        fonte: faina.fonte,
-        ...(feriado ? { feriado: true } : {}),
-      })
-      : undefined;
+    const majoracao = majoracaoDoPeriodoProjetado(periodo, faina.fonte);
     const custo = catalogo.calcularCustoDoPeriodo({
       faina,
       periodo,
