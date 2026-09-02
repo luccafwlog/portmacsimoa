@@ -74,8 +74,29 @@ o custo final nem uma previsão automática da operação.
    validação da simulação — é o que permite ver o efeito de um ajuste enquanto
    a soma dos ternos ainda não fechou. O gráfico do resultado repete esse
    desenho depois do cálculo, agora sobre o cenário aceito pelo motor.
-   Não existe varredura automática de produtividades: comparar cenários é mover
-   ternos e produtividades e ler o gráfico.
+   Não existe varredura automática de produtividades dentro do editor: ali
+   comparar cenários é mover ternos e produtividades e ler o gráfico.
+9. Antes de fechar o cenário, a **análise de produtividade** apresenta duas
+   leituras separadas de propósito.
+   - A **referência da faina** varre produtividades em um calendário neutro —
+     a primeira segunda-feira sem feriado na janela varrida — com volume e
+     ternos de referência declarados. Ela não depende de nada que o usuário
+     tenha digitado, e por isso é comparável entre fainas.
+   - O **cenário informado** varre a mesma grade sobre a data, o volume e os
+     ternos reais, e mostra quanto a duração escolhida custa em relação à mais
+     barata daquela semana.
+   A diferença entre as duas é a informação de negócio: o que a tabela cobra
+   contra o que aquela semana específica entrega. A mesma faina, com o mesmo
+   volume, tem ótimo em produtividades muito diferentes conforme a data — é o
+   feriado e o fim de semana que mandam, não a produtividade.
+10. A forma da curva de referência é classificada pelo produto
+   `custo por unidade × produtividade`, que é a quantidade efetivamente cobrada
+   por período e por terno. Enquanto a operação paga um piso, o produto fica
+   constante; assim que a produção supera o piso, ele passa a crescer. O
+   **joelho** é essa fronteira, e é o único "ótimo da faina" que se sustenta.
+   Sem piso cadastrado, o produto cresce desde o primeiro ponto (faina por
+   produção) ou fica constante do começo ao fim (salário-dia), e a análise diz
+   isso em vez de apontar um ótimo inexistente.
 ## Arquitetura de páginas
 
 - **Nova simulação** é a página principal e concentra a montagem do cenário.
@@ -101,6 +122,15 @@ o custo final nem uma previsão automática da operação.
   cálculo nunca divirjam na leitura.
 - `majoracaoDoPeriodoProjetado` é a única regra de majoração por período:
   o motor a usa para custear e a interface para desenhar o rascunho.
+- A grade de produtividades é linear e derivada da operação: os candidatos são
+  igualmente espaçados entre a produtividade que fecharia na duração mais longa
+  considerada e a que fecharia na mais curta. Uma grade construída a partir de
+  durações inteiras amontoaria os pontos justamente na faixa baixa, que é onde
+  um piso faz o custo unitário virar.
+- Toda varredura começa em um ciclo diário completo (quatro períodos).
+  Operações de um ou dois períodos cabem inteiras nas faixas diurnas e não
+  pagam adicional, o que as torna artificialmente baratas: isso é propriedade
+  do relógio, não da faina.
 - `src/styles.css` é uma camada única: os tokens vivem em um único `:root`,
   cada seletor aparece uma vez e as variações por largura ficam nas três
   media queries do fim do arquivo.
@@ -113,6 +143,23 @@ o custo final nem uma previsão automática da operação.
   documental das faixas e limites operacionais;
 - sem cobertura de feriados municipais, estaduais ou portuários;
 - sem banco, autenticação ou histórico.
+
+## Produção mínima garantida — pendente
+
+A regra de custo aceita `producaoMinimaPorTernoPorPeriodo`: com um piso, a
+quantidade cobrada é `max(produção, piso × ternos)`. **Nenhuma faina do catálogo
+declara esse valor**, e enquanto isso não mudar o cálculo não aplica piso algum.
+
+É esse piso que cria o joelho da curva de custo por produtividade — abaixo dele
+o custo unitário cai como 1/produtividade, acima dele fica plano. A curva de
+referência levantada pela PORTMAC na planilha legada de fertilizantes cai de
+R$ 34,05 a cerca de R$ 26,50 entre 500 e 700 t por terno e depois estabiliza;
+essa razão de 1,28 na ponta baixa implica um piso perto de 650 t por terno por
+período. Sem os valores documentais por faina, o simulador não tem como apontar
+um ótimo próprio da faina, e diz isso na análise em vez de inventar um número.
+
+A única faina que menciona o assunto é a ACT 1.1, e para dizer que é uma
+operação *sem* produção mínima.
 
 O catálogo da aplicação usa provisoriamente o mapeamento da planilha ACT
 2026/2028 para 8 fainas; o mapeamento da planilha CCT

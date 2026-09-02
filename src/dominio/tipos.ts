@@ -38,6 +38,21 @@ export interface RegraDeComposicaoProvisoria {
   readonly unidade: UnidadeDeMedida;
   /** Valor usado pela planilha como adicional de encargos/contribuições. */
   readonly encargosContribuicaoAdicional: number;
+  /**
+   * Produção mínima faturável por terno em um período, quando a tabela
+   * ACT/CCT garante um piso à equipe.
+   *
+   * Com um piso, a quantidade cobrada é `max(produção, mínimo × ternos)`: abaixo
+   * do piso paga-se o piso, acima dele paga-se a produção. É o que cria o joelho
+   * da curva de custo por produtividade — abaixo do ponto de virada o custo
+   * unitário cai como 1/produtividade, acima dele fica plano.
+   *
+   * PENDENTE DE LEVANTAMENTO: nenhuma faina do catálogo declara este valor
+   * ainda. Enquanto estiver ausente, o cálculo não aplica piso algum e a curva
+   * de referência não tem joelho. Só a ACT 1.1 menciona o assunto, e para dizer
+   * que é uma operação *sem* produção mínima.
+   */
+  readonly producaoMinimaPorTernoPorPeriodo?: number;
   readonly composicao: readonly ComposicaoCctProvisoria[];
 }
 

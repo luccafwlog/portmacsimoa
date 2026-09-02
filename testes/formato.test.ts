@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatarMoeda,
   formatarNumero,
+  formatarNumeroFixo,
   formatarPercentual,
   pluralizar,
   rotuloDaUnidade,
@@ -26,6 +27,14 @@ describe('formatação', () => {
   it('mantém as três casas do adicional das tabelas ACT/CCT', () => {
     expect(formatarPercentual(134.375)).toBe('134,375%');
     expect(formatarPercentual(87.5)).toBe('87,5%');
+  });
+
+  it('mantém as casas decimais fixas nos eixos', () => {
+    // Sem casas fixas o eixo alterna "R$ 4,3" e "R$ 3,98" e parece irregular.
+    expect(formatarNumeroFixo(4.3, 2)).toBe('4,30');
+    expect(formatarNumeroFixo(3.98, 2)).toBe('3,98');
+    expect(formatarNumeroFixo(1200, 0)).toBe('1.200');
+    expect(formatarNumeroFixo(Number.NaN, 2)).toBe('—');
   });
 
   it('concorda o substantivo com a quantidade', () => {

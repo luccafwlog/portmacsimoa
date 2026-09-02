@@ -117,9 +117,15 @@ function calcularCustoComposicaoProvisoria(
     periodo: contexto.periodo.identificador,
     fonte: faina.fonte,
   });
+  const pisoDoPeriodo = regra.producaoMinimaPorTernoPorPeriodo === undefined
+    ? 0
+    : regra.producaoMinimaPorTernoPorPeriodo * contexto.ternos;
+  // No regime de produção a tabela pode garantir um piso à equipe: cobra-se o
+  // que for maior entre a produção realizada e esse piso.
   const quantidadeBase = regra.regime === 'PRODUCAO'
-    ? contexto.producaoToneladas
+    ? Math.max(contexto.producaoToneladas, pisoDoPeriodo)
     : 1;
+  const pisoAplicado = regra.regime === 'PRODUCAO' && pisoDoPeriodo > contexto.producaoToneladas;
   const fatorEncargos = 1 + regra.encargosContribuicaoAdicional;
   const itens = regra.baseDeCalculo === 'TARIFA_UNITARIA'
     ? [{ categoria: 'Tarifa CCT', homens: 0, cotas: 0, funcoes: [] as readonly string[] }]
@@ -129,7 +135,9 @@ function calcularCustoComposicaoProvisoria(
     const custoBase = fatorDaEquipe * regra.taxaBase * quantidadeBase;
     const multiplicaPorTernos = regra.regime === 'SALARIO_DIA' ? contexto.ternos : 1;
     const custoTotal = custoBase * fatorEncargos * majoracao.fator * multiplicaPorTernos;
-    const unidade = regra.regime === 'PRODUCAO' ? 'produção do período' : 'salário-dia';
+    const unidade = regra.regime === 'PRODUCAO'
+      ? pisoAplicado ? 'produção mínima garantida' : 'produção do período'
+      : 'salário-dia';
     return {
       descricao: `${item.categoria} · ${item.homens} homens · ${regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 'tarifa unitária' : `${formatarNumero(item.cotas)} cotas agregadas`} × ${formatarNumero(regra.taxaBase, 4)} · ${unidade} · ${descricaoDoAdicional(majoracao.adicionalPercentual)}${regra.regime === 'SALARIO_DIA' ? ` · ${contexto.ternos} terno(s)` : ' · produção agregada dos ternos'}`,
       valor: custoTotal,

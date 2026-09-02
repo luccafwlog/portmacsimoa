@@ -27,6 +27,17 @@ a período, com um gráfico que acompanha cada ajuste ao vivo e mostra onde o
 adicional de jornada encarece a operação. Depois do cálculo, o mesmo desenho
 reaparece no resultado sobre o cenário aceito pelo motor.
 
+Antes de fechar o cenário, a análise de produtividade mostra duas curvas: a
+referência da faina, medida em calendário neutro e independente do que foi
+digitado, e o cenário informado, varrido sobre a data e o volume reais. A mesma
+faina tem ótimo em produtividades muito diferentes conforme a data de início —
+o feriado e o fim de semana pesam mais que a produtividade.
+
+O cálculo aceita uma produção mínima garantida por faina, que é o que faz o
+custo unitário parar de cair a partir de certa produtividade. Nenhuma faina do
+catálogo declara esse valor ainda; enquanto isso, a análise informa a forma da
+curva em vez de apontar um ótimo que o modelo não sustenta.
+
 Os orçamentos salvos ficam apenas no `localStorage` do navegador.
 
 As regras e os valores do OGMO entram por duas portas: `CatalogoOgmo` fornece a

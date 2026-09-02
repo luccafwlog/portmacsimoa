@@ -6,6 +6,7 @@ import type {
 import type { CatalogoOgmo } from '../src/catalogo/portas.js';
 import type { PeriodoOgmo } from '../src/dominio/tipos.js';
 import { EntradaInvalida, simular } from '../src/motor/simulador.js';
+import { gerarGradeDeProdutividades, otimizarCenario } from '../src/motor/otimizador.js';
 
 const catalogo: CatalogoOgmo = {
   listarFainas() {
@@ -287,6 +288,54 @@ describe('simulador mínimo', () => {
     expect(resultado.custoPorTonelada).toBe(75);
   });
 
+  it('calcula o ótimo em uma grade independente da produtividade informada', () => {
+    const entradaComProdutividadeBaixa = {
+      ...entrada,
+      volumeToneladas: 20,
+      produtividadeToneladasPorPeriodo: 5,
+      totalDeTernos: 3,
+      produtividadesPorPeriodo: [5, 5, 5, 5],
+    };
+    const { produtividadesPorPeriodo: _produtividades, ...entradaSemAjustes } = entradaComProdutividadeBaixa;
+    const entradaComProdutividadeAlta = {
+      ...entradaSemAjustes,
+      produtividadeToneladasPorPeriodo: 20,
+    };
+
+    const primeiraAnalise = otimizarCenario(
+      entradaComProdutividadeBaixa,
+      catalogo,
+      calendario,
+      [5, 10, 20],
+    );
+    const segundaAnalise = otimizarCenario(
+      entradaComProdutividadeAlta,
+      catalogo,
+      calendario,
+      [5, 10, 20],
+    );
+
+    expect(primeiraAnalise.melhor?.produtividade).toBe(20);
+    expect(segundaAnalise.melhor?.produtividade).toBe(20);
+    expect(primeiraAnalise.melhor?.periodos).toBe(1);
+    expect(primeiraAnalise.candidatos.map((candidato) => candidato.produtividade)).toEqual([10, 20]);
+    expect(primeiraAnalise.melhor?.resultado.periodos.reduce((total, periodo) => total + periodo.producaoToneladas, 0)).toBe(20);
+
+    const analiseComDoisTernos = otimizarCenario(
+      {
+        ...entradaSemAjustes,
+        volumeToneladas: 20,
+        produtividadeToneladasPorPeriodo: 10,
+        ternosPorPeriodoPadrao: 2,
+        totalDeTernos: 4,
+      },
+      catalogo,
+      calendario,
+      [5, 10, 20],
+    );
+    expect(analiseComDoisTernos.candidatos.map((candidato) => candidato.resultado.entrada.totalDeTernos)).toEqual([4, 2, 2]);
+  });
+
   it('aceita vários custos opcionais personalizados com descrição', () => {
     const resultado = simular(
       {
@@ -341,5 +390,58 @@ describe('memória do cenário', () => {
     }, catalogo, calendario);
 
     expect(resultado.memoria[0]?.descricao).toBe('Quantidade total (toneladas)');
+  });
+});
+
+describe('grade de produtividades', () => {
+  const volume = 9000;
+  const ternos = 2;
+
+  it('cobre da duração mais longa à mais curta da faixa', () => {
+    const grade = gerarGradeDeProdutividades(volume, ternos, { periodosMinimos: 2, periodosMaximos: 48 });
+    expect(Math.min(...grade)).toBeCloseTo(volume / (48 * ternos), 1);
+    expect(Math.max(...grade)).toBeCloseTo(volume / (2 * ternos), 1);
+  });
+
+  it('espaça os candidatos por igual, como a planilha de origem', () => {
+    const grade = [...gerarGradeDeProdutividades(volume, ternos, { pontos: 11 })].sort((a, b) => a - b);
+    const saltos = grade.slice(1).map((valor, indice) => valor - grade[indice]!);
+    const maior = Math.max(...saltos);
+    const menor = Math.min(...saltos);
+    // Uma grade derivada de durações inteiras teria saltos dezenas de vezes
+    // maiores no extremo rápido; aqui eles são praticamente iguais.
+    expect(maior - menor).toBeLessThan(0.05);
+  });
+
+  it('não repete produtividades e recusa operação sem volume ou sem ternos', () => {
+    const grade = gerarGradeDeProdutividades(volume, ternos);
+    expect(new Set(grade).size).toBe(grade.length);
+    expect(gerarGradeDeProdutividades(0, ternos)).toEqual([]);
+    expect(gerarGradeDeProdutividades(volume, 0)).toEqual([]);
+  });
+
+  it('cada candidato tem capacidade para o volume na duração prevista', () => {
+    for (const produtividade of gerarGradeDeProdutividades(volume, ternos)) {
+      const periodos = Math.ceil(volume / (produtividade * ternos));
+      expect(produtividade * ternos * periodos).toBeGreaterThanOrEqual(volume - 0.0001);
+    }
+  });
+
+  it('alimenta o otimizador com cenários viáveis do próprio volume', () => {
+    const entrada = {
+      faina: 'GRANITO',
+      inicio: { data: data(2026, 4, 17), periodo: '07-13' },
+      volumeToneladas: volume,
+      produtividadeToneladasPorPeriodo: 250,
+      ternosPorPeriodoPadrao: ternos,
+      totalDeTernos: 36,
+    } as const;
+    const otimizacao = otimizarCenario(entrada, catalogo, calendario, gerarGradeDeProdutividades(volume, ternos));
+    expect(otimizacao.candidatos.length).toBeGreaterThan(1);
+    for (const candidato of otimizacao.candidatos) {
+      expect(candidato.resultado.custoPorTonelada).toBeGreaterThan(0);
+    }
+    expect(otimizacao.melhor?.resultado.custoPorTonelada)
+      .toBe(Math.min(...otimizacao.candidatos.map((candidato) => candidato.resultado.custoPorTonelada)));
   });
 });

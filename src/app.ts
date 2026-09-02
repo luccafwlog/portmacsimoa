@@ -5,7 +5,9 @@ import { catalogoPortmac } from './catalogo/portmac.js';
 import type { CustoOpcional, EntradaDeSimulacao, LinhaDeMemoria, PeriodoOgmo, ResultadoDeSimulacao, TipoDeCustoOpcional } from './dominio/tipos.js';
 import type { MajoracaoDoPeriodo } from './dominio/majoracoes.js';
 import { majoracaoDoPeriodoProjetado, simular } from './motor/simulador.js';
-import { formatarMoeda, formatarNumero, pluralizar, rotuloDaUnidade } from './dominio/formato.js';
+import { gerarGradeDeProdutividades, otimizarCenario } from './motor/otimizador.js';
+import { analisarFainaDeReferencia, type ReferenciaDaFaina } from './motor/referencia.js';
+import { formatarMoeda, formatarNumero, formatarNumeroFixo, formatarPercentual, pluralizar, rotuloDaUnidade } from './dominio/formato.js';
 
 const form = document.querySelector<HTMLFormElement>('#simulation-form')!;
 const errorBox = document.querySelector<HTMLDivElement>('#error')!;
@@ -41,6 +43,8 @@ let periodosDoEditor: readonly PeriodoOgmo[] = [];
 let chaveDosPeriodosDoEditor = '';
 let fainaOptionIndex = -1;
 let catalogSourceFilter: 'TODAS' | 'ACT' | 'CCT' = 'TODAS';
+/** A referência depende só da faina; recalculá-la a cada tecla seria desperdício. */
+const referenciasPorFaina = new Map<string, ReferenciaDaFaina>();
 const SAVED_BUDGETS_KEY = 'sco-orcamentos-salvos';
 
 interface OrcamentoSalvo {
@@ -316,11 +320,11 @@ form.addEventListener('submit', (event) => {
   event.preventDefault();
   recalculate();
 });
-volumeInput.addEventListener('input', () => { markScenarioDirty(); updateCalculatedPeriods(); updateTernosPreview(); });
-productivityInput.addEventListener('input', () => { markScenarioDirty(); updateCalculatedPeriods(); updateTernosPreview(); });
-ternosPorPeriodoInput.addEventListener('input', () => { markScenarioDirty(); updateCalculatedPeriods(); updateTernosPreview(); });
-dateInput.addEventListener('change', () => { markScenarioDirty(); updateTernosPreview(); });
-periodInput.addEventListener('change', () => { markScenarioDirty(); updateTernosPreview(); });
+volumeInput.addEventListener('input', aoMudarOCenario);
+productivityInput.addEventListener('input', aoMudarOCenario);
+ternosPorPeriodoInput.addEventListener('input', aoMudarOCenario);
+dateInput.addEventListener('change', aoMudarOCenario);
+periodInput.addEventListener('change', aoMudarOCenario);
 catalogSearchInput.addEventListener('input', renderCatalogPage);
 catalogFilterButtons.forEach((button) => button.addEventListener('click', () => {
   catalogSourceFilter = button.dataset.catalogSource as 'TODAS' | 'ACT' | 'CCT';
@@ -375,8 +379,32 @@ addCustomCostButton.addEventListener('click', addCustomCost);
 updateCalculatedPeriods();
 updateOperationUnitLabels();
 updateTernosPreview();
+renderAnaliseDeProdutividade();
 window.addEventListener('hashchange', () => renderRoute(routeFromHash()));
 renderRoute(routeFromHash());
+
+/**
+ * Um campo do cenário mudou: refaz o que depende dele.
+ *
+ * A análise varre dezenas de simulações, então entra no mesmo agendamento por
+ * quadro dos ajustes do editor — digitar um volume não deve disparar uma
+ * varredura por tecla.
+ */
+function aoMudarOCenario(): void {
+  markScenarioDirty();
+  updateCalculatedPeriods();
+  updateTernosPreview();
+  agendarAnalise();
+}
+
+let quadroDeAnaliseAgendado = 0;
+function agendarAnalise(): void {
+  if (quadroDeAnaliseAgendado) return;
+  quadroDeAnaliseAgendado = requestAnimationFrame(() => {
+    quadroDeAnaliseAgendado = 0;
+    renderAnaliseDeProdutividade();
+  });
+}
 
 function recalculate(
   distribution?: readonly number[],
@@ -610,9 +638,278 @@ function renderPeriodCostChart(resultado: ResultadoDeSimulacao): void {
   renderScenarioChart(container, barras, unidade);
 }
 
+interface PontoDaCurva {
+  readonly produtividade: number;
+  readonly custo: number;
+  readonly periodos: number;
+}
+
+interface MarcaDaCurva {
+  readonly produtividade: number;
+  readonly rotulo: string;
+  readonly variante: 'joelho' | 'cenario';
+}
+
+/**
+ * Curva de custo por unidade em função da produtividade.
+ *
+ * O eixo X é linear porque a grade também é: pontos igualmente espaçados
+ * mostram o joelho onde ele está, em vez de amontoá-lo na ponta baixa.
+ */
+/**
+ * Análise de produtividade, exibida antes de fechar o cenário.
+ *
+ * São duas leituras distintas e propositalmente separadas: a **referência da
+ * faina**, medida em calendário neutro e independente do que o usuário digitou,
+ * e o **cenário informado**, que varre a produtividade sobre a data, o volume e
+ * os ternos reais. A diferença entre as duas é a informação de negócio — o que
+ * a tabela cobra contra o que aquela semana específica entrega.
+ */
+function renderAnaliseDeProdutividade(): void {
+  const painel = document.querySelector<HTMLElement>('#analise-produtividade');
+  if (!painel) return;
+  const faina = catalogoPortmac.obterFaina(fainaCodeInput.value);
+  painel.hidden = !faina;
+  if (!faina) return;
+  const unidade = rotuloDaUnidade(faina.unidade);
+  renderReferenciaDaFaina(faina, unidade);
+  renderAnaliseDoCenario(faina, unidade);
+  const pendencia = document.querySelector<HTMLElement>('#analise-pendencia');
+  if (pendencia) {
+    const referencia = referenciaDaFaina(faina);
+    pendencia.hidden = referencia?.forma === 'JOELHO';
+    pendencia.textContent = 'Nenhuma faina do catálogo declara produção mínima garantida. É esse piso que faz o custo por unidade parar de cair a partir de uma produtividade — sem ele, o simulador não tem como apontar um ótimo próprio da faina.';
+  }
+}
+
+function referenciaDaFaina(faina: NonNullable<ReturnType<typeof catalogoPortmac.obterFaina>>): ReferenciaDaFaina | undefined {
+  const emCache = referenciasPorFaina.get(faina.codigo);
+  if (emCache) return emCache;
+  try {
+    const referencia = analisarFainaDeReferencia(faina, catalogoPortmac, calendarioOperacional);
+    referenciasPorFaina.set(faina.codigo, referencia);
+    return referencia;
+  } catch {
+    return undefined;
+  }
+}
+
+function renderReferenciaDaFaina(
+  faina: NonNullable<ReturnType<typeof catalogoPortmac.obterFaina>>,
+  unidade: ReturnType<typeof rotuloDaUnidade>,
+): void {
+  const bloco = document.querySelector<HTMLElement>('#analise-referencia');
+  const corpo = document.querySelector<HTMLElement>('#analise-referencia-body');
+  const leitura = document.querySelector<HTMLElement>('#analise-referencia-leitura');
+  const rodape = document.querySelector<HTMLElement>('#analise-referencia-base');
+  if (!bloco || !corpo || !leitura || !rodape) return;
+  const referencia = referenciaDaFaina(faina);
+  bloco.hidden = !referencia || referencia.pontos.length < 2;
+  if (!referencia || referencia.pontos.length < 2) return;
+
+  rodape.textContent = `${formatarNumero(referencia.volumeDeReferencia)} ${unidade.abreviacao} · ${pluralizar(referencia.ternosDeReferencia, 'terno', 'ternos')} · semana sem feriado a partir de ${formatarDataPtBr(referencia.inicio.data)}`;
+  leitura.textContent = leituraDaReferencia(referencia, unidade);
+  const marcas: MarcaDaCurva[] = referencia.joelho
+    ? [{ produtividade: referencia.joelho.produtividade, rotulo: 'ótimo da faina', variante: 'joelho' }]
+    : [];
+  renderCurveChart(
+    corpo,
+    referencia.pontos.map((ponto) => ({ produtividade: ponto.produtividade, custo: ponto.custoPorUnidade, periodos: ponto.periodos })),
+    unidade,
+    marcas,
+  );
+}
+
+/** O que a curva de referência afirma, sem prometer mais do que ela sustenta. */
+function leituraDaReferencia(
+  referencia: ReferenciaDaFaina,
+  unidade: ReturnType<typeof rotuloDaUnidade>,
+): string {
+  const variacao = formatarPercentual(referencia.amplitude * 100, 1);
+  switch (referencia.forma) {
+    case 'JOELHO':
+      return `O custo por ${unidade.singular} cai até ${formatarNumero(referencia.joelho!.produtividade)} ${unidade.abreviacao} por terno por período e estabiliza a partir daí: abaixo dessa marca a operação paga a produção mínima garantida, e não o que moveu. Esse é o ótimo da faina.`;
+    case 'DECRESCENTE':
+      return `Quanto maior a produtividade, menor o custo por ${unidade.singular} — a faina é remunerada por salário-dia, então a equipe custa o mesmo movendo mais ou menos. Não há ponto de virada: terminar antes é sempre mais barato.`;
+    case 'CONSTANTE':
+      return `O custo por ${unidade.singular} praticamente não muda com a produtividade (${variacao} em toda a faixa). Nesta faina a produtividade define a duração da operação, não o preço unitário.`;
+    default:
+      return `O custo por ${unidade.singular} varia ${variacao} na faixa, mas o menor valor não está na ponta mais produtiva: o que oscila é em que faixas de jornada a operação cai, não a produtividade. Esta faina não tem um ótimo próprio enquanto não houver produção mínima cadastrada.`;
+  }
+}
+
+function renderAnaliseDoCenario(
+  faina: NonNullable<ReturnType<typeof catalogoPortmac.obterFaina>>,
+  unidade: ReturnType<typeof rotuloDaUnidade>,
+): void {
+  const bloco = document.querySelector<HTMLElement>('#analise-cenario');
+  const corpo = document.querySelector<HTMLElement>('#analise-cenario-body');
+  const leitura = document.querySelector<HTMLElement>('#analise-cenario-leitura');
+  const rodape = document.querySelector<HTMLElement>('#analise-cenario-base');
+  const selo = document.querySelector<HTMLElement>('#analise-badge');
+  if (!bloco || !corpo || !leitura || !rodape) return;
+
+  const entrada = entradaDoCenarioParaAnalise(faina.codigo);
+  bloco.hidden = !entrada;
+  if (!entrada) {
+    if (selo) selo.textContent = 'informe data, volume e ternos para comparar o seu cenário';
+    return;
+  }
+  // A faixa acompanha a ordem de grandeza da operação: varrer até doze dias
+  // encheria o gráfico de durações que ninguém consideraria.
+  const ternosPorPeriodo = entrada.ternosPorPeriodoPadrao ?? 1;
+  const periodosDoCenario = Math.ceil(entrada.volumeToneladas / (entrada.produtividadeToneladasPorPeriodo * ternosPorPeriodo));
+  const grade = gerarGradeDeProdutividades(entrada.volumeToneladas, ternosPorPeriodo, {
+    periodosMaximos: Math.max(12, Math.ceil(periodosDoCenario * 2)),
+  });
+  const otimizacao = otimizarCenario(entrada, catalogoPortmac, calendarioOperacional, grade);
+  const melhor = otimizacao.melhor;
+  bloco.hidden = otimizacao.candidatos.length < 2 || !melhor;
+  if (otimizacao.candidatos.length < 2 || !melhor) {
+    if (selo) selo.textContent = 'cenário sem alternativas comparáveis';
+    return;
+  }
+
+  const informada = entrada.produtividadeToneladasPorPeriodo;
+  const noCenario = custoDaProdutividadeInformada(entrada);
+  rodape.textContent = `${formatarNumero(entrada.volumeToneladas)} ${unidade.abreviacao} · ${pluralizar(entrada.ternosPorPeriodoPadrao ?? 1, 'terno', 'ternos')} por período · início ${formatarDataPtBr(entrada.inicio.data)} ${entrada.inicio.periodo}`;
+  if (selo) {
+    selo.textContent = `Melhor duração: ${pluralizar(melhor.periodos, 'período', 'períodos')} a ${formatarNumero(melhor.produtividade)} ${unidade.abreviacao}/terno · ${formatarMoeda(melhor.resultado.custoPorTonelada)} por ${unidade.singular}`;
+  }
+  leitura.textContent = leituraDoCenario(melhor, informada, noCenario, unidade);
+
+  const marcas: MarcaDaCurva[] = [
+    { produtividade: melhor.produtividade, rotulo: 'melhor', variante: 'joelho' },
+  ];
+  if (informada > 0) marcas.push({ produtividade: informada, rotulo: 'informada', variante: 'cenario' });
+  renderCurveChart(
+    corpo,
+    otimizacao.candidatos.map((candidato) => ({
+      produtividade: candidato.produtividade,
+      custo: candidato.resultado.custoPorTonelada,
+      periodos: candidato.periodos,
+    })),
+    unidade,
+    marcas,
+  );
+}
+
+function leituraDoCenario(
+  melhor: NonNullable<ReturnType<typeof otimizarCenario>['melhor']>,
+  informada: number,
+  custoInformado: number | undefined,
+  unidade: ReturnType<typeof rotuloDaUnidade>,
+): string {
+  const otimo = melhor.resultado.custoPorTonelada;
+  if (custoInformado === undefined) {
+    return `Na data e no volume informados, o menor custo por ${unidade.singular} aparece em ${formatarNumero(melhor.produtividade)} ${unidade.abreviacao} por terno por período, fechando em ${pluralizar(melhor.periodos, 'período', 'períodos')}.`;
+  }
+  const diferenca = custoInformado - otimo;
+  if (diferenca <= 0.005) {
+    return `A produtividade informada (${formatarNumero(informada)} ${unidade.abreviacao}) já está no melhor ponto desta data e deste volume: ${formatarMoeda(otimo)} por ${unidade.singular}.`;
+  }
+  const percentual = formatarPercentual((diferenca / custoInformado) * 100, 1);
+  return `A ${formatarNumero(informada)} ${unidade.abreviacao} por terno o cenário custa ${formatarMoeda(custoInformado)} por ${unidade.singular}. Fechando em ${pluralizar(melhor.periodos, 'período', 'períodos')} — ${formatarNumero(melhor.produtividade)} ${unidade.abreviacao} por terno — cairia para ${formatarMoeda(otimo)}, ${percentual} menos. A diferença vem das faixas de jornada em que cada duração cai; o modelo não conhece limite de produtividade, então leia a comparação como o que a tabela cobra em cada duração, não como uma meta de berço.`;
+}
+
+/** Cenário completo o bastante para varrer produtividades; senão, nada. */
+function entradaDoCenarioParaAnalise(codigo: string): EntradaDeSimulacao | undefined {
+  const volume = Number(volumeInput.value);
+  const produtividade = Number(productivityInput.value);
+  const ternos = Number(ternosPorPeriodoInput.value);
+  const [ano, mes, dia] = dateInput.value.split('-').map(Number);
+  if (!(volume > 0) || !(produtividade > 0)) return undefined;
+  if (!Number.isInteger(ternos) || ternos < 1 || ternos > 4) return undefined;
+  if (!ano || !mes || !dia || !periodInput.value) return undefined;
+  const periodos = Math.ceil(volume / (produtividade * ternos));
+  return {
+    faina: codigo,
+    inicio: { data: data(ano, mes, dia), periodo: periodInput.value },
+    volumeToneladas: volume,
+    produtividadeToneladasPorPeriodo: produtividade,
+    ternosPorPeriodoPadrao: ternos,
+    totalDeTernos: ternos * periodos,
+  };
+}
+
+function custoDaProdutividadeInformada(entrada: EntradaDeSimulacao): number | undefined {
+  try {
+    return simular(entrada, catalogoPortmac, calendarioOperacional).custoPorTonelada;
+  } catch {
+    return undefined;
+  }
+}
+
+function renderCurveChart(
+  container: HTMLElement,
+  pontos: readonly PontoDaCurva[],
+  unidade: ReturnType<typeof rotuloDaUnidade>,
+  marcas: readonly MarcaDaCurva[],
+): void {
+  if (pontos.length < 2) {
+    container.removeAttribute('role');
+    container.innerHTML = '';
+    return;
+  }
+  const ordenados = [...pontos].sort((a, b) => a.produtividade - b.produtividade);
+  const xs = ordenados.map((ponto) => ponto.produtividade);
+  const ys = ordenados.map((ponto) => ponto.custo);
+  const xMin = Math.min(...xs, ...marcas.map((marca) => marca.produtividade));
+  const xMax = Math.max(...xs, ...marcas.map((marca) => marca.produtividade));
+  const menor = Math.min(...ys);
+  const maior = Math.max(...ys);
+  const folga = Math.max((maior - menor) * .18, maior * .04, .01);
+  const yMin = Math.max(0, menor - folga);
+  const yMax = maior + folga;
+
+  const { esquerda, topo, altura, base } = GRAFICO;
+  const x = (valor: number) => xMax === xMin
+    ? esquerda + GRAFICO_LARGURA_UTIL / 2
+    : esquerda + ((valor - xMin) / (xMax - xMin)) * GRAFICO_LARGURA_UTIL;
+  const y = (valor: number) => yMax === yMin
+    ? topo + GRAFICO_ALTURA_UTIL / 2
+    : topo + GRAFICO_ALTURA_UTIL - ((valor - yMin) / (yMax - yMin)) * GRAFICO_ALTURA_UTIL;
+  const grade = gradeHorizontal(y, Array.from({ length: 5 }, (_, i) => yMin + ((yMax - yMin) / 4) * i));
+  const linha = ordenados
+    .map((ponto, indice) => `${indice === 0 ? 'M' : 'L'} ${x(ponto.produtividade).toFixed(2)} ${y(ponto.custo).toFixed(2)}`)
+    .join(' ');
+  const passo = passoDeRotulos(ordenados.length, 8);
+  const marcadores = ordenados.map((ponto, indice) => {
+    const descricao = `${formatarNumero(ponto.produtividade)} ${unidade.abreviacao}/terno/período · ${pluralizar(ponto.periodos, 'período', 'períodos')} · ${formatarMoeda(ponto.custo)} por ${unidade.singular}`;
+    return `<circle class="curve-point" cx="${x(ponto.produtividade).toFixed(2)}" cy="${y(ponto.custo).toFixed(2)}" r="3.5"><title>${escapeHtml(descricao)}</title></circle>
+      <text class="chart-axis-label chart-axis-label-x" x="${x(ponto.produtividade).toFixed(2)}" y="${altura - base + 22}">${indice % passo === 0 ? escapeHtml(formatarNumero(ponto.produtividade, 0)) : ''}</text>`;
+  }).join('');
+  const guias = marcas.map((marca) => {
+    const posicao = x(marca.produtividade);
+    const rotulo = Math.min(Math.max(posicao, esquerda + 26), esquerda + GRAFICO_LARGURA_UTIL - 26);
+    return `<line class="curve-guide curve-guide-${marca.variante}" x1="${posicao.toFixed(2)}" y1="${topo}" x2="${posicao.toFixed(2)}" y2="${topo + GRAFICO_ALTURA_UTIL}" />
+      <text class="curve-guide-label curve-guide-label-${marca.variante}" x="${rotulo.toFixed(2)}" y="${topo - 10}">${escapeHtml(marca.rotulo)}</text>`;
+  }).join('');
+
+  container.setAttribute('role', 'img');
+  container.setAttribute('aria-label', `Custo por ${unidade.singular} em função da produtividade, de ${formatarMoeda(menor)} a ${formatarMoeda(maior)}.${marcas.map((marca) => ` ${marca.rotulo} em ${formatarNumero(marca.produtividade)} ${unidade.abreviacao} por terno por período.`).join('')}`);
+  container.innerHTML = `<div class="chart-scroll"><svg class="chart-svg" viewBox="0 0 ${GRAFICO.largura} ${altura}" aria-hidden="true" focusable="false">
+    <text class="chart-axis-title chart-axis-title-y" x="18" y="${topo + GRAFICO_ALTURA_UTIL / 2}" transform="rotate(-90 18 ${topo + GRAFICO_ALTURA_UTIL / 2})">Custo por ${escapeHtml(unidade.singular)} (R$)</text>
+    ${grade}
+    ${eixos()}
+    ${guias}
+    <path class="curve-line" d="${linha}" />
+    ${marcadores}
+    <text class="chart-axis-title chart-axis-title-x" x="${esquerda + GRAFICO_LARGURA_UTIL / 2}" y="${altura - 12}">Produtividade por terno por período (${escapeHtml(unidade.abreviacao)})</text>
+  </svg></div>`;
+}
+
+/**
+ * Rótulo do eixo de valores, com precisão conforme a ordem de grandeza.
+ *
+ * Custo por tonelada de sacaria vive entre R$ 2 e R$ 4: arredondar para
+ * inteiro faria todos os rótulos virarem "R$ 3" e o eixo não diria nada.
+ */
 function formatarValorEixo(value: number): string {
-  if (value >= 1000) return `R$ ${formatarNumero(value / 1000, 1)} mil`;
-  return `R$ ${formatarNumero(value, 0)}`;
+  if (value >= 1000) return `R$ ${formatarNumeroFixo(value / 1000, 1)} mil`;
+  if (value >= 100) return `R$ ${formatarNumeroFixo(value, 0)}`;
+  if (value >= 10) return `R$ ${formatarNumeroFixo(value, 1)}`;
+  return `R$ ${formatarNumeroFixo(value, 2)}`;
 }
 function saveCurrentBudget(): void {
   if (!currentResult) return;
@@ -1103,6 +1400,7 @@ function selectFaina(codigo?: string): void {
   markScenarioDirty();
   updateOperationUnitLabels();
   updateTernosPreview();
+  agendarAnalise();
 }
 
 function handleFainaInput(): void {
@@ -1111,6 +1409,7 @@ function handleFainaInput(): void {
   renderFainaOptions();
   openFainaOptions();
   updateOperationUnitLabels();
+  agendarAnalise();
 }
 
 function handleFainaKeydown(event: KeyboardEvent): void {

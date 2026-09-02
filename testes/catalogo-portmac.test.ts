@@ -112,3 +112,48 @@ describe('catálogo documental do PORTMAC', () => {
       .toBe(true);
   });
 });
+
+describe('produção mínima garantida', () => {
+  const base = fainasActProvisorias.find((registro) => registro.codigoDaTabela === '3.1')!;
+  const comPiso: RegistroDeFaina = {
+    ...base,
+    regraActProvisoria: { ...base.regraActProvisoria!, producaoMinimaPorTernoPorPeriodo: 400 },
+  };
+  const diaNormal = { ...periodo, data: data(2026, 9, 8), identificador: '07-13' };
+
+  function custoDe(registro: RegistroDeFaina, producao: number, ternos: number): number {
+    return new CatalogoPortmac([registro]).calcularCustoDoPeriodo({
+      faina: registro,
+      periodo: diaNormal,
+      producaoToneladas: producao,
+      ternos,
+    }).total;
+  }
+
+  it('nenhuma faina do catálogo declara piso, então o cálculo atual não muda', () => {
+    const declaram = [...fainasActProvisorias, ...fainasCctProvisorias].filter((registro) =>
+      (registro.regraActProvisoria ?? registro.regraCctProvisoria)?.producaoMinimaPorTernoPorPeriodo !== undefined);
+    expect(declaram).toEqual([]);
+  });
+
+  it('cobra o piso quando a produção fica abaixo dele', () => {
+    // 100 t produzidas contra um piso de 400 t por terno: cobra-se o piso.
+    expect(custoDe(comPiso, 100, 1)).toBeCloseTo(custoDe(base, 400, 1), 6);
+  });
+
+  it('cobra a produção quando ela supera o piso', () => {
+    expect(custoDe(comPiso, 900, 1)).toBeCloseTo(custoDe(base, 900, 1), 6);
+  });
+
+  it('multiplica o piso pelos ternos alocados no período', () => {
+    expect(custoDe(comPiso, 100, 2)).toBeCloseTo(custoDe(base, 800, 2), 6);
+  });
+
+  it('anuncia na memória que o piso foi aplicado', () => {
+    const catalogo = new CatalogoPortmac([comPiso]);
+    const abaixo = catalogo.calcularCustoDoPeriodo({ faina: comPiso, periodo: diaNormal, producaoToneladas: 100, ternos: 1 });
+    const acima = catalogo.calcularCustoDoPeriodo({ faina: comPiso, periodo: diaNormal, producaoToneladas: 900, ternos: 1 });
+    expect(abaixo.memoria[0]?.descricao).toContain('produção mínima garantida');
+    expect(acima.memoria[0]?.descricao).toContain('produção do período');
+  });
+});
