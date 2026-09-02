@@ -47,6 +47,20 @@ export function formatarNumero(valor: number, casasDecimais = 2): string {
   return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: casasDecimais }).format(valor);
 }
 
+/**
+ * Como `formatarNumero`, mas com casas decimais fixas.
+ *
+ * Eixos e colunas de valores ficam desalinhados quando o zero final some:
+ * `R$ 4,3` ao lado de `R$ 3,98` faz a escala parecer irregular.
+ */
+export function formatarNumeroFixo(valor: number, casasDecimais: number): string {
+  if (!Number.isFinite(valor)) return '—';
+  return valor.toLocaleString('pt-BR', {
+    minimumFractionDigits: casasDecimais,
+    maximumFractionDigits: casasDecimais,
+  });
+}
+
 /** `87,5%` — o adicional das tabelas ACT/CCT chega a três casas. */
 export function formatarPercentual(valor: number, casasDecimais = 3): string {
   return `${formatarNumero(valor, casasDecimais)}%`;

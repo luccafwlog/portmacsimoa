@@ -393,40 +393,50 @@ describe('memória do cenário', () => {
   });
 });
 
-describe('grade de produtividades da sensibilidade', () => {
-  const entrada = {
-    faina: 'GRANITO',
-    inicio: { data: data(2026, 4, 17), periodo: '07-13' },
-    volumeToneladas: 9000,
-    produtividadeToneladasPorPeriodo: 250,
-    ternosPorPeriodoPadrao: 2,
-    totalDeTernos: 36,
-  } as const;
+describe('grade de produtividades', () => {
+  const volume = 9000;
+  const ternos = 2;
 
-  it('deriva cada candidato de um número inteiro de períodos', () => {
-    const grade = gerarGradeDeProdutividades(entrada, 18);
-    // O arredondamento é para cima justamente para que a capacidade cubra o
-    // volume no mesmo número de períodos que originou o candidato.
-    for (const produtividade of grade) {
-      const periodos = Math.ceil(entrada.volumeToneladas / (produtividade * entrada.ternosPorPeriodoPadrao));
-      expect(produtividade * entrada.ternosPorPeriodoPadrao * periodos).toBeGreaterThanOrEqual(entrada.volumeToneladas);
+  it('cobre da duração mais longa à mais curta da faixa', () => {
+    const grade = gerarGradeDeProdutividades(volume, ternos, { periodosMinimos: 2, periodosMaximos: 48 });
+    expect(Math.min(...grade)).toBeCloseTo(volume / (48 * ternos), 1);
+    expect(Math.max(...grade)).toBeCloseTo(volume / (2 * ternos), 1);
+  });
+
+  it('espaça os candidatos por igual, como a planilha de origem', () => {
+    const grade = [...gerarGradeDeProdutividades(volume, ternos, { pontos: 11 })].sort((a, b) => a - b);
+    const saltos = grade.slice(1).map((valor, indice) => valor - grade[indice]!);
+    const maior = Math.max(...saltos);
+    const menor = Math.min(...saltos);
+    // Uma grade derivada de durações inteiras teria saltos dezenas de vezes
+    // maiores no extremo rápido; aqui eles são praticamente iguais.
+    expect(maior - menor).toBeLessThan(0.05);
+  });
+
+  it('não repete produtividades e recusa operação sem volume ou sem ternos', () => {
+    const grade = gerarGradeDeProdutividades(volume, ternos);
+    expect(new Set(grade).size).toBe(grade.length);
+    expect(gerarGradeDeProdutividades(0, ternos)).toEqual([]);
+    expect(gerarGradeDeProdutividades(volume, 0)).toEqual([]);
+  });
+
+  it('cada candidato tem capacidade para o volume na duração prevista', () => {
+    for (const produtividade of gerarGradeDeProdutividades(volume, ternos)) {
+      const periodos = Math.ceil(volume / (produtividade * ternos));
+      expect(produtividade * ternos * periodos).toBeGreaterThanOrEqual(volume - 0.0001);
     }
   });
 
-  it('cobre pelo menos o dobro dos períodos do cenário informado', () => {
-    const grade = gerarGradeDeProdutividades(entrada, 18);
-    const maisLenta = Math.min(...grade);
-    expect(Math.ceil(entrada.volumeToneladas / (maisLenta * 2))).toBeGreaterThanOrEqual(36);
-  });
-
-  it('não repete produtividades e ignora operações sem volume', () => {
-    const grade = gerarGradeDeProdutividades(entrada, 4);
-    expect(new Set(grade).size).toBe(grade.length);
-    expect(gerarGradeDeProdutividades({ ...entrada, volumeToneladas: 0 }, 4)).toEqual([]);
-  });
-
   it('alimenta o otimizador com cenários viáveis do próprio volume', () => {
-    const otimizacao = otimizarCenario(entrada, catalogo, calendario, gerarGradeDeProdutividades(entrada, 18));
+    const entrada = {
+      faina: 'GRANITO',
+      inicio: { data: data(2026, 4, 17), periodo: '07-13' },
+      volumeToneladas: volume,
+      produtividadeToneladasPorPeriodo: 250,
+      ternosPorPeriodoPadrao: ternos,
+      totalDeTernos: 36,
+    } as const;
+    const otimizacao = otimizarCenario(entrada, catalogo, calendario, gerarGradeDeProdutividades(volume, ternos));
     expect(otimizacao.candidatos.length).toBeGreaterThan(1);
     for (const candidato of otimizacao.candidatos) {
       expect(candidato.resultado.custoPorTonelada).toBeGreaterThan(0);

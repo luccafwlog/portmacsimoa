@@ -181,7 +181,7 @@
                   </div>
                 </summary>
                 <div class="ternos-editor-content">
-                  <p class="panel-caption">Ajuste a produtividade e a quantidade de ternos de cada período. Os totais distribuídos precisam ser exatamente iguais aos valores da operação.</p>
+                  <p class="panel-caption">Ajuste a produtividade e a quantidade de ternos de cada período: o gráfico acompanha cada movimento. Para calcular o cenário, os totais distribuídos precisam ficar exatamente iguais aos da operação.</p>
                   <div class="distribution-totals" aria-live="polite">
                     <div class="distribution-total">
                       <span>Volume distribuído</span>
@@ -195,6 +195,13 @@
                     </div>
                   </div>
                   <div id="ternos-editor-status" class="distribution-status" hidden></div>
+                  <section id="editor-chart" class="editor-chart" aria-labelledby="editor-chart-title" hidden>
+                    <div class="editor-chart-heading">
+                      <h3 id="editor-chart-title">Cenário em edição</h3>
+                      <span id="editor-chart-summary" class="sum-badge"></span>
+                    </div>
+                    <div id="editor-chart-body" class="scenario-chart-body"></div>
+                  </section>
                   <div class="table-wrap ternos-editor-table-wrap">
                     <table>
                       <thead>
@@ -205,6 +212,36 @@
                   </div>
                 </div>
               </details>
+
+              <section id="analise-produtividade" class="analysis-panel" aria-labelledby="analise-title" hidden>
+                <div class="analysis-heading">
+                  <div>
+                    <span class="section-index">03</span>
+                    <h2 id="analise-title">Análise de produtividade</h2>
+                  </div>
+                  <span id="analise-badge" class="sum-badge"></span>
+                </div>
+
+                <div id="analise-referencia" class="analysis-block" hidden>
+                  <div class="analysis-block-heading">
+                    <span class="analysis-caption">Referência da faina</span>
+                    <span id="analise-referencia-base" class="analysis-base"></span>
+                  </div>
+                  <p id="analise-referencia-leitura" class="analysis-reading"></p>
+                  <div id="analise-referencia-body" class="scenario-chart-body"></div>
+                </div>
+
+                <div id="analise-cenario" class="analysis-block" hidden>
+                  <div class="analysis-block-heading">
+                    <span class="analysis-caption">Seu cenário</span>
+                    <span id="analise-cenario-base" class="analysis-base"></span>
+                  </div>
+                  <p id="analise-cenario-leitura" class="analysis-reading"></p>
+                  <div id="analise-cenario-body" class="scenario-chart-body"></div>
+                </div>
+
+                <p id="analise-pendencia" class="analysis-note"></p>
+              </section>
 
               <div class="form-actions">
                 <p class="form-actions-hint">O cenário é recalculado do zero a cada envio.</p>
@@ -256,7 +293,7 @@
               <section class="panel cost-breakdown" aria-labelledby="cost-breakdown-title">
                 <div class="panel-heading cost-breakdown-heading">
                   <div>
-                    <span class="section-index">03</span>
+                    <span class="section-index">04</span>
                     <h2 id="cost-breakdown-title">Composição do custo</h2>
                   </div>
                   <span class="sum-badge">mão de obra + opcionais</span>
@@ -285,7 +322,7 @@
               <section class="panel calculation-memory" aria-labelledby="calculation-memory-title">
                 <div class="panel-heading cost-breakdown-heading">
                   <div>
-                    <span class="section-index">04</span>
+                    <span class="section-index">05</span>
                     <h2 id="calculation-memory-title">Memória detalhada</h2>
                   </div>
                   <span class="sum-badge">fórmula aplicada</span>
@@ -296,24 +333,13 @@
               <section class="panel period-cost-chart" aria-labelledby="period-cost-chart-title">
                 <div class="panel-heading cost-breakdown-heading">
                   <div>
-                    <span class="section-index">05</span>
-                    <h2 id="period-cost-chart-title">Custo por período</h2>
+                    <span class="section-index">06</span>
+                    <h2 id="period-cost-chart-title">Cenário calculado</h2>
                   </div>
                   <span id="period-cost-chart-summary" class="sum-badge"></span>
                 </div>
+                <p class="panel-caption">O cenário desenhado no detalhamento por períodos, com o custo de cada período e os ternos alocados nele.</p>
                 <div id="period-cost-chart-body" class="period-cost-chart-body"></div>
-              </section>
-
-              <section class="panel productivity-sensitivity" aria-labelledby="productivity-sensitivity-title">
-                <div class="panel-heading cost-breakdown-heading">
-                  <div>
-                    <span class="section-index">06</span>
-                    <h2 id="productivity-sensitivity-title">Sensibilidade à produtividade</h2>
-                  </div>
-                  <span id="productivity-sensitivity-summary" class="sum-badge">cenários comparativos</span>
-                </div>
-                <p class="panel-caption sensitivity-caption">Cada cenário comparado responde a “e se a operação fechasse em <em>n</em> períodos?”. A grade sai do volume e dos ternos informados — nunca da produtividade digitada — e cada ponto é recalculado pelo motor oficial. O modelo de custo não conhece limite físico de produtividade: nas fainas por produção o menor custo por unidade tende sempre ao cenário mais curto, porque só a majoração de jornada muda. Leia o ótimo como o que a tabela ACT/CCT cobra, não como o que o berço consegue produzir.</p>
-                <div id="productivity-sensitivity-body" class="productivity-sensitivity-body"></div>
               </section>
 
               <section class="save-budget-panel" aria-labelledby="save-budget-title">

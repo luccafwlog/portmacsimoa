@@ -14,38 +14,59 @@ export interface ResultadoDeOtimizacao {
   readonly melhor: PontoDeOtimizacao | undefined;
 }
 
-/** Teto de candidatos da grade; cada um custa uma simulação completa. */
-const PERIODOS_MAXIMOS_DA_GRADE = 96;
-const PERIODOS_MINIMOS_DA_GRADE = 24;
+/** Quantos candidatos a grade produz; cada um custa uma simulação completa. */
+const PONTOS_DA_GRADE = 28;
+/**
+ * Durações que a faixa varrida cobre, em períodos de seis horas.
+ *
+ * O piso é um ciclo diário completo: uma operação de um ou dois períodos cabe
+ * inteira nas faixas diurnas e não paga adicional nenhum, o que a torna
+ * artificialmente barata. Isso é propriedade do relógio, não da operação, e
+ * faria a varredura recomendar sempre a duração mais curta possível.
+ */
+const PERIODOS_MINIMOS_DA_GRADE = 4;
+const PERIODOS_MAXIMOS_DA_GRADE = 48;
+
+export interface FaixaDaGrade {
+  /** Duração mais curta considerada, em períodos. */
+  readonly periodosMinimos?: number;
+  /** Duração mais longa considerada, em períodos. */
+  readonly periodosMaximos?: number;
+  readonly pontos?: number;
+}
 
 /**
- * Grade de comparação derivada da operação, não da produtividade informada.
+ * Grade linear de produtividades derivada da operação.
  *
- * Cada candidato responde a uma pergunta operacional — "e se a operação fechar
- * em k períodos?" — e a produtividade correspondente sai de `volume ÷ (k ×
- * ternos por período)`. A grade depende apenas do volume e dos ternos, que são
- * fatos da operação; a produtividade-base entra somente na largura da faixa
- * varrida, nunca na escolha do ótimo.
+ * A faixa sai do volume e dos ternos — fatos da operação —, indo da
+ * produtividade que fecharia na duração mais longa considerada até a que
+ * fecharia na mais curta. Dentro dela os candidatos são igualmente espaçados,
+ * como na planilha de origem: uma grade que varresse durações inteiras
+ * amontoaria os pontos justamente na faixa baixa, que é onde uma produção
+ * mínima faz o custo unitário virar.
  *
- * O arredondamento é sempre para cima: uma produtividade truncada para baixo
- * empurraria `ceil(volume ÷ capacidade)` para k + 1 e a grade repetiria
- * períodos.
+ * A produtividade informada pelo usuário não entra: ela não pode definir a
+ * faixa em que a própria escolha será julgada.
  */
 export function gerarGradeDeProdutividades(
-  entrada: EntradaDeSimulacao,
-  periodosDoCenario: number,
+  volume: number,
+  ternosPorPeriodo: number,
+  faixa: FaixaDaGrade = {},
 ): readonly number[] {
-  const ternosPorPeriodo = entrada.ternosPorPeriodoPadrao ?? 1;
-  if (!(entrada.volumeToneladas > 0) || ternosPorPeriodo <= 0) return [];
-  const limite = Math.min(
-    PERIODOS_MAXIMOS_DA_GRADE,
-    Math.max(PERIODOS_MINIMOS_DA_GRADE, Math.ceil(periodosDoCenario * 2)),
-  );
+  const periodosMinimos = Math.max(1, faixa.periodosMinimos ?? PERIODOS_MINIMOS_DA_GRADE);
+  const periodosMaximos = Math.max(periodosMinimos, faixa.periodosMaximos ?? PERIODOS_MAXIMOS_DA_GRADE);
+  const pontos = Math.max(2, faixa.pontos ?? PONTOS_DA_GRADE);
+  if (!(volume > 0) || !(ternosPorPeriodo > 0)) return [];
+
+  const menor = volume / (periodosMaximos * ternosPorPeriodo);
+  const maior = volume / (periodosMinimos * ternosPorPeriodo);
+  const passo = (maior - menor) / (pontos - 1);
   const grade = new Set<number>();
-  for (let periodos = 1; periodos <= limite; periodos += 1) {
-    const exata = entrada.volumeToneladas / (periodos * ternosPorPeriodo);
-    const arredondada = Math.ceil(exata * 100) / 100;
-    if (arredondada > 0 && Number.isFinite(arredondada)) grade.add(arredondada);
+  for (let indice = 0; indice < pontos; indice += 1) {
+    // Duas casas bastam para uma produtividade cotável, e arredondar para cima
+    // garante que a capacidade do candidato cubra o volume na duração prevista.
+    const valor = Math.ceil((menor + passo * indice) * 100) / 100;
+    if (valor > 0 && Number.isFinite(valor)) grade.add(valor);
   }
   return [...grade];
 }

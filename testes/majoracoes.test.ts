@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { data } from '../src/dominio/tempo.js';
 import { obterMajoracaoDoPeriodo } from '../src/dominio/majoracoes.js';
+import { majoracaoDoPeriodoProjetado } from '../src/motor/simulador.js';
 import { calendarioOperacional } from '../src/calendario/operacional.js';
 import { CatalogoPortmac } from '../src/catalogo/portmac.js';
 import { fainasActProvisorias } from '../src/catalogo/act-provisorio.js';
@@ -127,5 +128,47 @@ describe('majorações por período', () => {
     expect(resultado.periodos[0]?.custo.memoria).toHaveLength(2);
     expect(resultado.periodos[0]?.custo.memoria[0]?.descricao).toContain('tarifa unitária');
     expect(resultado.periodos[0]?.custo.memoria[1]?.descricao).toContain('CCT provisória');
+  });
+});
+
+describe('majoração de um período projetado', () => {
+  const periodo = (dia: number, identificador: string) => ({
+    indice: 0,
+    data: data(2026, 4, dia),
+    identificador,
+  });
+
+  it('reconhece a faixa noturna de um dia útil', () => {
+    // 17/04/2026 é uma sexta-feira.
+    const majoracao = majoracaoDoPeriodoProjetado(periodo(17, '19-01'), 'ACT');
+    expect(majoracao?.tipoDeDia).toBe('NORMAL');
+    expect(majoracao?.faixa).toBe('NOITE');
+    expect(majoracao?.adicionalPercentual).toBe(25);
+  });
+
+  it('reconhece o domingo pela data', () => {
+    // 19/04/2026 é um domingo.
+    const majoracao = majoracaoDoPeriodoProjetado(periodo(19, '07-13'), 'ACT');
+    expect(majoracao?.tipoDeDia).toBe('DOMINGO');
+    expect(majoracao?.adicionalPercentual).toBe(87.5);
+  });
+
+  it('reconhece o feriado municipal do calendário de Vila Velha', () => {
+    // 28/04 é Nossa Senhora da Penha.
+    const majoracao = majoracaoDoPeriodoProjetado(periodo(28, '07-13'), 'CCT');
+    expect(majoracao?.tipoDeDia).toBe('FERIADO');
+    expect(majoracao?.adicionalPercentual).toBe(100);
+  });
+
+  it('não devolve majoração para uma faixa fora da tabela', () => {
+    expect(majoracaoDoPeriodoProjetado(periodo(17, 'MANUTENCAO'), 'ACT')).toBeUndefined();
+  });
+
+  it('responde igual ao que o simulador aplica no mesmo período', () => {
+    // A interface desenha o rascunho com esta função e o motor calcula com ela:
+    // divergir aqui faria o gráfico ao vivo mentir sobre o custo.
+    const projetado = majoracaoDoPeriodoProjetado(periodo(19, '19-01'), 'ACT');
+    const direto = obterMajoracaoDoPeriodo({ data: data(2026, 4, 19), periodo: '19-01', fonte: 'ACT' });
+    expect(projetado).toEqual(direto);
   });
 });
