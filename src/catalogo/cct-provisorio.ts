@@ -1,4 +1,5 @@
 import type {
+  BaseDeCalculoProvisoria,
   ComposicaoCctProvisoria,
   RegimeRemuneratorio,
   UnidadeDeMedida,
@@ -81,25 +82,29 @@ function codigoInterno(codigo: string): string {
   return `CCT_PROVISORIA_${codigo.replace(/\./g, '_')}`;
 }
 
-export const fainasCctProvisorias: readonly RegistroDeFaina[] = DEFINICOES.map((definicao) => ({
-  codigo: codigoInterno(definicao.codigo),
-  codigoDaTabela: definicao.codigo,
-  grupoDaTabela: `CCT PROVISÓRIA · ${definicao.grupo}`,
-  descricao: definicao.descricao,
-  tipoDeCarga: definicao.descricao,
-  unidade: definicao.unidade,
-  fonte: 'CCT',
-  status: 'PROVISORIA',
-  vigencia: '2024/2026',
-  referencia: `Mapeamento provisório · Analise_CCT_Calculadora_Terno_Portuario (1).xlsx · ${definicao.codigo} · ${definicao.observacao}`,
-  regraCctProvisoria: {
+export const fainasCctProvisorias: readonly RegistroDeFaina[] = DEFINICOES.map((definicao) => {
+  const regra = {
     taxaBase: definicao.taxaBase,
-    baseDeCalculo: definicao.regime === 'PRODUCAO' ? 'TARIFA_UNITARIA' : 'COTAS_DA_EQUIPE',
+    baseDeCalculo: (definicao.regime === 'PRODUCAO' ? 'TARIFA_UNITARIA' : 'COTAS_DA_EQUIPE') as BaseDeCalculoProvisoria,
     regime: definicao.regime,
     unidade: definicao.unidade,
     encargosContribuicaoAdicional: ENCARGOS_E_CONTRIBUICOES,
     composicao: definicao.codigo === '14.1.1' || definicao.codigo === '14.3.1' || definicao.codigo === '16.0'
       ? COMPOSICAO_SALARIO_DIA
       : COMPOSICAO_PADRAO,
-  },
-}));
+  };
+  return {
+    codigo: codigoInterno(definicao.codigo),
+    codigoDaTabela: definicao.codigo,
+    grupoDaTabela: `CCT PROVISÓRIA · ${definicao.grupo}`,
+    descricao: definicao.descricao,
+    tipoDeCarga: definicao.descricao,
+    unidade: definicao.unidade,
+    fonte: 'CCT',
+    status: 'PROVISORIA',
+    vigencia: '2024/2026',
+    referencia: `Mapeamento provisório · Analise_CCT_Calculadora_Terno_Portuario (1).xlsx · ${definicao.codigo} · ${definicao.observacao}`,
+    regra,
+    regraCctProvisoria: regra,
+  };
+});

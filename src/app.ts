@@ -1,10 +1,34 @@
 import './styles.css';
 import { data, formatarDataPtBr } from './dominio/tempo.js';
+import { obterUnidade } from './dominio/unidade.js';
 import { calendarioOperacional } from './calendario/operacional.js';
 import { catalogoPortmac } from './catalogo/portmac.js';
 import type { CustoOpcional, EntradaDeSimulacao, PeriodoOgmo, ResultadoDeSimulacao, TipoDeCustoOpcional } from './dominio/tipos.js';
-import { simular } from './motor/simulador.js';
-import { otimizarCenario, type ResultadoDeOtimizacao } from './motor/otimizador.js';
+import { simular, distribuirTernos } from './motor/simulador.js';
+import { obterAnaliseDeSensibilidade } from './motor/sensibilidade.js';
+import {
+  escapeHtml,
+  money,
+  normalizarBusca,
+  number,
+  numberOf,
+  quaseIgual,
+  setText,
+  valueOf,
+} from './ui/formato.js';
+import { gerarGraficoCustoPeriodos, gerarGraficoSensibilidade } from './ui/graficos.js';
+import {
+  OPTIONAL_COST_LABELS,
+  printSavedBudget,
+  renderClientsPage,
+  saveBudget,
+} from './ui/orcamentos.js';
+import { renderCatalogPage } from './ui/catalogo-view.js';
+import {
+  renderDistributionTotals,
+  showDistributionError,
+  volumeDistribuidoPorPeriodos,
+} from './ui/editor-periodos.js';
 
 const form = document.querySelector<HTMLFormElement>('#simulation-form')!;
 const errorBox = document.querySelector<HTMLDivElement>('#error')!;
@@ -27,62 +51,16 @@ const catalogSearchInput = document.querySelector<HTMLInputElement>('#catalog-se
 const catalogFilterButtons = document.querySelectorAll<HTMLButtonElement>('[data-catalog-source]');
 const ternosEditorBody = document.querySelector<HTMLTableSectionElement>('#ternos-editor-body')!;
 const ternosEditorStatus = document.querySelector<HTMLDivElement>('#ternos-editor-status')!;
-const ternosEditorVolumeTotal = document.querySelector<HTMLElement>('#ternos-editor-volume-total')!;
-const ternosEditorVolumeTarget = document.querySelector<HTMLElement>('#ternos-editor-volume-target')!;
-const ternosEditorTernosTotal = document.querySelector<HTMLElement>('#ternos-editor-ternos-total')!;
-const ternosEditorTernosTarget = document.querySelector<HTMLElement>('#ternos-editor-ternos-target')!;
+
 let currentResult: ResultadoDeSimulacao | undefined;
 let customCostCounter = 0;
 let draftDistribution: readonly number[] = [];
 let draftProductivities: readonly number[] = [];
 let fainaOptionIndex = -1;
 let catalogSourceFilter: 'TODAS' | 'ACT' | 'CCT' = 'TODAS';
-const SAVED_BUDGETS_KEY = 'sco-orcamentos-salvos';
-
-interface OrcamentoSalvo {
-  readonly id: string;
-  readonly cliente: string;
-  readonly criadoEm: string;
-  readonly resultado: ResultadoDeSimulacao;
-}
-
-interface PontoDeSensibilidade {
-  readonly produtividade: number;
-  readonly custoPorTonelada: number;
-  readonly periodos: number;
-  readonly ehCenarioAtual?: boolean;
-}
-
-interface AnaliseDeSensibilidade {
-  readonly pontos: readonly PontoDeSensibilidade[];
-  readonly otimizacao: ResultadoDeOtimizacao;
-}
-
-/** Série de referência da aba “Gráficos” da planilha legada de fertilizantes. */
-const CURVA_OTIMO_FERTILIZANTES: readonly [number, number][] = [
-  [500, 34.05], [525, 32.45], [550, 30.8], [575, 29.46], [600, 29.46],
-  [625, 28.11], [650, 26.92], [675, 27.35], [700, 26.32], [725, 26.7],
-  [750, 26.21], [775, 26.57], [800, 26.94], [825, 26.61], [850, 26.95],
-  [875, 27.29], [900, 26.62], [925, 26.93], [950, 27.25], [975, 26.47],
-  [1000, 26.76], [1025, 27.05], [1050, 27.34], [1075, 27.63], [1100, 26.99],
-  [1125, 27.26], [1150, 27.53], [1175, 27.79], [1200, 28.06], [1225, 27.31],
-  [1250, 27.55], [1275, 27.8], [1300, 28.04], [1325, 28.29], [1350, 28.54],
-  [1375, 28.78], [1400, 27.46], [1425, 27.68], [1450, 27.9], [1475, 28.11],
-  [1500, 28.33], [1525, 28.55], [1550, 28.77], [1575, 28.99], [1600, 29.21],
-  [1625, 27.59], [1650, 27.78], [1675, 27.97], [1700, 28.16], [1725, 28.35],
-  [1750, 28.54], [1775, 28.73], [1800, 28.92],
-];
 
 const fainasSelecionaveis = catalogoPortmac.listarFainas()
   .filter((faina) => faina.status !== 'PENDENTE_DE_VALIDACAO');
-
-const optionalCostLabels: Record<TipoDeCustoOpcional, string> = {
-  MATERIAL_DE_PEACAO: 'Material de peação',
-  MADEIRA: 'Madeira',
-  LOCACAO_DE_MAQUINA: 'Locação de máquina',
-  MATERIAL_DE_ICAMENTO: 'Material de içamento',
-  OUTRO: 'Outro custo',
-};
 
 type AppRoute = 'nova-simulacao' | 'clientes' | 'catalogo';
 
@@ -99,177 +77,12 @@ function renderRoute(route: AppRoute): void {
     if (active) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
-  if (route === 'catalogo') renderCatalogPage();
-  if (route === 'clientes') renderClientsPage();
+  if (route === 'catalogo') renderCatalogPage(catalogoPortmac, catalogSearchInput.value, catalogSourceFilter);
+  if (route === 'clientes') renderClientsPage(catalogoPortmac);
   document.title = route === 'nova-simulacao'
     ? 'SCO · Nova simulação'
     : route === 'clientes' ? 'SCO · Clientes cadastrados' : 'SCO · Catálogo de fainas';
   window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function renderCatalogPage(): void {
-  const registros = catalogoPortmac.listarRegistros();
-  const tableBody = document.querySelector<HTMLTableSectionElement>('#catalog-table-body')!;
-  const actCount = registros.filter((registro) => registro.fonte === 'ACT').length;
-  const cctCount = registros.filter((registro) => registro.fonte === 'CCT').length;
-  const termo = normalizarBusca(catalogSearchInput.value);
-  const filtrados = registros.filter((registro) => {
-    if (catalogSourceFilter !== 'TODAS' && registro.fonte !== catalogSourceFilter) return false;
-    if (!termo) return true;
-    return normalizarBusca([
-      registro.descricao,
-      registro.codigo,
-      registro.codigoDaTabela,
-      registro.grupoDaTabela,
-      registro.tipoDeCarga,
-      registro.referencia,
-    ].filter(Boolean).join(' ')).includes(termo);
-  });
-
-  setText('#catalog-count', String(registros.length));
-  setText('#catalog-act-count', String(actCount));
-  setText('#catalog-cct-count', String(cctCount));
-  setText('#catalog-visible-count', `${filtrados.length} ${filtrados.length === 1 ? 'faina encontrada' : 'fainas encontradas'}`);
-  tableBody.innerHTML = filtrados.length ? filtrados.map((registro) => {
-    const regra = registro.regra;
-    const regraCct = registro.regraCctProvisoria;
-    const regraAct = registro.regraActProvisoria;
-    const regraPlanilha = regraAct ?? regraCct;
-    const status = registro.status === 'PENDENTE_DE_VALIDACAO' || (!regra && !regraPlanilha)
-      ? '<span class="pending-pill">Pendente</span><small>aguarda validação</small>'
-      : registro.status === 'PROVISORIA'
-        ? '<span class="pending-pill">Provisória</span><small>aguarda documento oficial</small>'
-      : `<span class="ready-pill">Disponível</span><small>regra habilitada</small>`;
-    const detailsId = `catalog-details-${registro.codigo}`;
-    return `
-    <tr>
-      <td>
-        <strong>${escapeHtml(registro.descricao)}</strong>
-        <small>${escapeHtml(registro.tipoDeCarga)} · código ${escapeHtml(registro.codigoDaTabela ?? registro.codigo)}</small>
-        <button class="catalog-details-button" type="button" aria-expanded="false" aria-controls="${detailsId}" data-catalog-details="${detailsId}"><span aria-hidden="true">+</span> Detalhes</button>
-      </td>
-      <td><span class="catalog-group">${escapeHtml(registro.grupoDaTabela ?? 'Catálogo ACT')}</span><small>${escapeHtml(registro.vigencia)}</small></td>
-      <td><span class="source-pill source-${registro.fonte.toLowerCase()}">${registro.fonte}</span>${status}</td>
-      <td><span class="rule-value">${escapeHtml(registro.unidade)}</span><small>unidade da tabela</small></td>
-      <td>${regra ? `<span class="rule-value">${money(regra.taxaEstivaPorTonelada)}</span><small>estiva / ton / cota · ${number(regra.cotasEstivaPorTerno)} cotas/terno · conferentes ${money(regra.taxaConferentesPorTonelada)} / ton</small>` : regraPlanilha ? `<span class="rule-value">${money(regraPlanilha.taxaBase)}</span><small>${regraPlanilha.baseDeCalculo === 'TARIFA_UNITARIA' ? 'tarifa unitária; não multiplicada por cotas' : 'cotas da equipe'} · ${regraPlanilha.regime === 'PRODUCAO' ? 'produção' : 'salário-dia'} · +${number(regraPlanilha.encargosContribuicaoAdicional * 100)}% encargos</small>` : '<span class="pending-rule">Regra não habilitada</span><small>transcrição documental</small>'}</td>
-    </tr>
-    <tr id="${detailsId}" class="catalog-details-row" hidden>
-      <td colspan="5">${regraPlanilha ? renderCatalogMethod(registro, regraPlanilha) : '<div class="catalog-method-body"><p>Esta faina ainda não possui uma regra de custo habilitada.</p></div>'}</td>
-    </tr>
-  `;
-  }).join('') : '<tr><td colspan="5" class="catalog-empty-result">Nenhuma faina corresponde aos filtros atuais.</td></tr>';
-}
-
-function renderClientsPage(): void {
-  const list = document.querySelector<HTMLDivElement>('#client-budget-list');
-  const empty = document.querySelector<HTMLElement>('#clients-empty');
-  if (!list || !empty) return;
-  const budgets = readSavedBudgets();
-  empty.hidden = budgets.length > 0;
-  list.hidden = budgets.length === 0;
-  list.innerHTML = budgets.map((budget) => {
-    const faina = catalogoPortmac.obterFaina(budget.resultado.entrada.faina);
-    const unidade = unidadeDaFaina(faina?.unidade);
-    return `<article class="saved-budget" data-budget-id="${escapeHtml(budget.id)}">
-      <div class="saved-budget-heading">
-        <div><span class="saved-budget-client">${escapeHtml(budget.cliente)}</span><small>salvo em ${escapeHtml(formatarDataHora(budget.criadoEm))}</small></div>
-        <span class="result-chip">${escapeHtml(faina?.fonte ?? 'SCO')} · ${escapeHtml(faina?.vigencia ?? 'provisório')}</span>
-      </div>
-      <div class="saved-budget-grid">
-        <div><span>Faina</span><strong>${escapeHtml(faina?.descricao ?? budget.resultado.entrada.faina)}</strong></div>
-        <div><span>Operação</span><strong>${number(budget.resultado.entrada.volumeToneladas)} · ${number(budget.resultado.quantidadeDePeriodos)} períodos</strong></div>
-        <div><span>Custo por ${escapeHtml(unidade.singular)}</span><strong class="saved-budget-primary-cost">${money(budget.resultado.custoPorTonelada)}</strong></div>
-        <div><span>Custo total</span><strong>${money(budget.resultado.custoTotal)}</strong></div>
-      </div>
-      <div class="saved-budget-actions">
-        <details class="saved-budget-details">
-          <summary><span aria-hidden="true">+</span> Ver cenário completo</summary>
-          ${renderSavedBudgetDetails(budget.resultado, faina)}
-        </details>
-        <button class="secondary-button print-budget-button" type="button" data-print-budget="${escapeHtml(budget.id)}">Imprimir simulação</button>
-      </div>
-    </article>`;
-  }).join('');
-}
-
-function renderSavedBudgetDetails(resultado: ResultadoDeSimulacao, faina?: ReturnType<typeof catalogoPortmac.obterFaina>): string {
-  const unidade = unidadeDaFaina(faina?.unidade);
-  const entrada = resultado.entrada;
-  return `<div class="saved-scenario-details">
-    <div class="saved-scenario-section">
-      <span class="saved-scenario-caption">Dados da operação</span>
-      <div class="saved-scenario-grid">
-        <div><span>Faina</span><strong>${escapeHtml(faina?.descricao ?? entrada.faina)}</strong></div>
-        <div><span>Início</span><strong>${formatarDataPtBr(entrada.inicio.data)} · ${escapeHtml(entrada.inicio.periodo)}</strong></div>
-        <div><span>Quantidade</span><strong>${number(entrada.volumeToneladas)} ${unidade.abreviacao}</strong></div>
-        <div><span>Produtividade-base</span><strong>${number(entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/terno/período</strong></div>
-        <div><span>Períodos calculados</span><strong>${number(resultado.quantidadeDePeriodos)}</strong></div>
-        <div><span>Ternos por período</span><strong>${number(entrada.ternosPorPeriodoPadrao ?? (resultado.quantidadeDePeriodos ? entrada.totalDeTernos / resultado.quantidadeDePeriodos : 0))}</strong></div>
-        <div><span>Total de ternos calculado</span><strong>${number(entrada.totalDeTernos)}</strong></div>
-      </div>
-    </div>
-    <div class="saved-scenario-section">
-      <span class="saved-scenario-caption">Composição por período</span>
-      <div class="saved-period-table-wrap"><table class="saved-period-table"><thead><tr><th>Data</th><th>Período</th><th>Produtividade / terno</th><th>Produção</th><th>Ternos</th><th>Majoração</th><th>Custo</th></tr></thead><tbody>
-        ${resultado.periodos.map((periodo, indice) => `<tr><td>${formatarDataPtBr(periodo.periodo.data)}</td><td>${escapeHtml(periodo.periodo.identificador)}</td><td>${number(resultado.entrada.produtividadesPorPeriodo?.[indice] ?? resultado.entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/terno</td><td>${number(periodo.producaoToneladas)} ${unidade.abreviacao}</td><td>${number(periodo.ternos)}</td><td>${escapeHtml(periodo.custo.majoracao?.descricao ?? 'preço normal')}</td><td>${money(periodo.custo.total)}</td></tr>`).join('')}
-      </tbody></table></div>
-    </div>
-    <div class="saved-scenario-section saved-period-memory">
-      <span class="saved-scenario-caption">Memória por período</span>
-      <div class="saved-period-memory-list">
-        ${resultado.periodos.map((periodo) => `<details class="saved-period-memory-item">
-          <summary>${formatarDataPtBr(periodo.periodo.data)} · ${escapeHtml(periodo.periodo.identificador)} <strong>${money(periodo.custo.total)}</strong></summary>
-          <div class="saved-period-memory-lines">
-            ${periodo.custo.memoria.map((linha) => `<div><span>${escapeHtml(linha.descricao)}</span><strong>${money(linha.valor)}</strong></div>`).join('')}
-          </div>
-        </details>`).join('')}
-      </div>
-    </div>
-    ${resultado.custosOpcionais.length ? `<div class="saved-scenario-section saved-scenario-costs">
-      <span class="saved-scenario-caption">Custos opcionais</span>
-      ${resultado.custosOpcionais.map((custo) => {
-        const label = custo.tipo === 'OUTRO' ? custo.descricao?.trim() || optionalCostLabels.OUTRO : optionalCostLabels[custo.tipo];
-        return `<div><span>${escapeHtml(label)}</span><strong>${money(custo.custoTotal)}</strong></div>`;
-      }).join('')}
-    </div>` : ''}
-    <div class="saved-scenario-section saved-scenario-costs">
-      <span class="saved-scenario-caption">Resumo financeiro</span>
-      ${resultado.memoria.map((linha) => `<div><span>${escapeHtml(linha.descricao)}</span><strong>${money(linha.valor)}</strong></div>`).join('')}
-    </div>
-  </div>`;
-}
-
-function renderCatalogMethod(
-  registro: ReturnType<typeof catalogoPortmac.listarRegistros>[number],
-  regra: NonNullable<ReturnType<typeof catalogoPortmac.listarRegistros>[number]['regraActProvisoria'] | ReturnType<typeof catalogoPortmac.listarRegistros>[number]['regraCctProvisoria']>,
-): string {
-  const fator = regra.baseDeCalculo === 'TARIFA_UNITARIA' ? '1 tarifa unitária' : 'cotas da equipe';
-  const formula = regra.regime === 'PRODUCAO'
-    ? regra.baseDeCalculo === 'TARIFA_UNITARIA'
-      ? 'tarifa-base × produção agregada dos ternos × encargos × majoração'
-      : 'cotas × tarifa-base × produção agregada dos ternos × encargos × majoração'
-    : regra.baseDeCalculo === 'TARIFA_UNITARIA'
-      ? 'tarifa-base × encargos × majoração × ternos'
-      : 'cotas × tarifa-base × encargos × majoração × ternos';
-  const composition = regra.composicao.map((item) =>
-    `<li>${escapeHtml(item.categoria)}: ${item.homens} homens · ${number(item.cotas)} cotas${item.funcoes.length ? ` · ${escapeHtml(item.funcoes.join(', '))}` : ''}</li>`,
-  ).join('');
-  return `<div class="catalog-method-body">
-    <div class="catalog-reference-detail"><span>Referência documental</span><small>${escapeHtml(registro.referencia)}</small></div>
-    <p><strong>Fórmula aplicada</strong><br><code>${formula}</code></p>
-    <div class="catalog-method-grid">
-      <div><span>Base monetária</span><strong>${money(regra.taxaBase)}</strong></div>
-      <div><span>Unidade</span><strong>${escapeHtml(regra.unidade)}</strong></div>
-      <div><span>Regime</span><strong>${regra.regime === 'PRODUCAO' ? 'produção' : 'salário-dia'}</strong></div>
-      <div><span>Tratamento da equipe</span><strong>${fator}</strong></div>
-      <div><span>Encargos</span><strong>+${number(regra.encargosContribuicaoAdicional * 100)}%</strong></div>
-      <div><span>Fonte</span><strong>${escapeHtml(registro.fonte)} · ${escapeHtml(registro.codigoDaTabela ?? registro.codigo)}</strong></div>
-    </div>
-    <p class="catalog-method-note">${regra.regime === 'PRODUCAO'
-      ? 'A produtividade informada é por terno; a produção do período já representa a soma da produtividade dos ternos alocados e não é multiplicada novamente.'
-      : 'A remuneração é calculada por terno e multiplicada pela quantidade de ternos do período.'}</p>
-    <ul>${composition}</ul>
-  </div>`;
 }
 
 renderFainaOptions();
@@ -284,7 +97,7 @@ productivityInput.addEventListener('input', () => { markScenarioDirty(); updateC
 ternosPorPeriodoInput.addEventListener('input', () => { markScenarioDirty(); updateCalculatedPeriods(); updateTernosPreview(); });
 dateInput.addEventListener('change', () => { markScenarioDirty(); updateTernosPreview(); });
 periodInput.addEventListener('change', () => { markScenarioDirty(); updateTernosPreview(); });
-catalogSearchInput.addEventListener('input', renderCatalogPage);
+catalogSearchInput.addEventListener('input', () => renderCatalogPage(catalogoPortmac, catalogSearchInput.value, catalogSourceFilter));
 catalogFilterButtons.forEach((button) => button.addEventListener('click', () => {
   catalogSourceFilter = button.dataset.catalogSource as 'TODAS' | 'ACT' | 'CCT';
   catalogFilterButtons.forEach((filter) => {
@@ -292,7 +105,7 @@ catalogFilterButtons.forEach((button) => button.addEventListener('click', () => 
     filter.classList.toggle('active', active);
     filter.setAttribute('aria-pressed', String(active));
   });
-  renderCatalogPage();
+  renderCatalogPage(catalogoPortmac, catalogSearchInput.value, catalogSourceFilter);
 }));
 fainaInput.addEventListener('input', handleFainaInput);
 fainaInput.addEventListener('focus', () => openFainaOptions());
@@ -300,10 +113,10 @@ fainaInput.addEventListener('keydown', handleFainaKeydown);
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Node) || !fainaInput.closest('.combobox')?.contains(event.target)) closeFainaOptions();
 });
-document.querySelector<HTMLButtonElement>('#save-budget')?.addEventListener('click', saveCurrentBudget);
+document.querySelector<HTMLButtonElement>('#save-budget')?.addEventListener('click', handleSaveBudget);
 document.addEventListener('click', (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest<HTMLButtonElement>('[data-print-budget]') : null;
-  if (button) printSavedBudget(button.dataset.printBudget);
+  if (button) printSavedBudget(button.dataset.printBudget, catalogoPortmac, calendarioOperacional);
 });
 document.addEventListener('click', (event) => {
   const detailsButton = event.target instanceof HTMLElement ? event.target.closest<HTMLButtonElement>('[data-catalog-details]') : null;
@@ -334,6 +147,7 @@ addCustomCostButton.addEventListener('click', addCustomCost);
 updateCalculatedPeriods();
 updateOperationUnitLabels();
 updateTernosPreview();
+renderCatalogPage(catalogoPortmac, '', 'TODAS');
 window.addEventListener('hashchange', () => renderRoute(routeFromHash()));
 renderRoute(routeFromHash());
 
@@ -383,7 +197,7 @@ function render(resultado: ResultadoDeSimulacao): void {
   setText('#result-source', faina ? `${faina.fonte}${faina.status === 'PROVISORIA' ? ' · PROVISÓRIA' : ''} · ${faina.vigencia}` : 'fonte não encontrada');
   setText('#result-client', resultado.entrada.cliente ? `Cliente: ${resultado.entrada.cliente}` : 'Cliente não informado');
   setText('#labor-cost-total', money(resultado.custoDeMaoDeObra));
-  const unidade = unidadeDaFaina(faina?.unidade);
+  const unidade = obterUnidade(faina?.unidade);
   setText('#cost-per-unit-label', `Custo por ${unidade.singular}`);
   setText('#labor-cost-per-unit', `${money(resultado.custoDeMaoDeObra / resultado.entrada.volumeToneladas)} / ${unidade.abreviacao}`);
   setText('#composed-cost-total', money(resultado.custoTotal));
@@ -400,8 +214,7 @@ function render(resultado: ResultadoDeSimulacao): void {
     ? `${number(resultado.entrada.volumeToneladas)} ${unidade.abreviacao} ÷ (produtividade por terno ajustada × ternos por período) = ${resultado.quantidadeDePeriodos} períodos · ${number(ternosPorPeriodo)} terno(s)/período · calendário de Vila Velha aplicado`
     : `${number(resultado.entrada.volumeToneladas)} ${unidade.abreviacao} ÷ (${number(resultado.entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/terno/período × ${number(ternosPorPeriodo)} terno(s)) = ${resultado.quantidadeDePeriodos} períodos · calendário de Vila Velha aplicado`);
   renderCalculationMemory(resultado);
-  renderPeriodCostChart(resultado);
-  renderProductivitySensitivity(resultado);
+  renderCharts(resultado);
   renderTernosEditor(resultado);
   const saveButton = document.querySelector<HTMLButtonElement>('#save-budget');
   const saveHint = document.querySelector<HTMLElement>('#save-budget-hint');
@@ -413,175 +226,45 @@ function render(resultado: ResultadoDeSimulacao): void {
   }
 }
 
-function renderPeriodCostChart(resultado: ResultadoDeSimulacao): void {
-  const container = document.querySelector<HTMLDivElement>('#period-cost-chart-body');
-  const summary = document.querySelector<HTMLElement>('#period-cost-chart-summary');
-  if (!container || !summary) return;
-  const custos = resultado.periodos.map((periodo) => periodo.custo.total);
-  const maiorCusto = Math.max(...custos, 0);
-  const media = custos.length ? custos.reduce((total, custo) => total + custo, 0) / custos.length : 0;
-  summary.textContent = `${resultado.periodos.length} períodos · média ${money(media)}`;
-  container.setAttribute('role', 'img');
-  container.setAttribute('aria-label', `Gráfico de custo por período. Maior custo: ${money(maiorCusto)}. Média: ${money(media)}.`);
-  const width = 860;
-  const height = 340;
-  const left = 120;
-  const right = 24;
-  const top = 24;
-  const bottom = 72;
-  const plotWidth = width - left - right;
-  const plotHeight = height - top - bottom;
-  const ticks = 4;
-  const step = maiorCusto / ticks;
-  const barSlot = resultado.periodos.length ? plotWidth / resultado.periodos.length : plotWidth;
-  const barWidth = Math.max(6, Math.min(34, barSlot * .58));
-  const y = (value: number) => top + plotHeight - (maiorCusto > 0 ? value / maiorCusto : 0) * plotHeight;
-  const grid = Array.from({ length: ticks + 1 }, (_, indice) => {
-    const value = step * indice;
-    const lineY = y(value);
-    return `<line class="chart-grid-line" x1="${left}" y1="${lineY.toFixed(2)}" x2="${width - right}" y2="${lineY.toFixed(2)}" />
-      <text class="chart-axis-label chart-axis-label-y" x="${left - 12}" y="${(lineY + 4).toFixed(2)}">${escapeHtml(formatarValorEixo(value))}</text>`;
-  }).join('');
-  const bars = resultado.periodos.map((periodo, indice) => {
-    const custo = periodo.custo.total;
-    const barHeight = maiorCusto > 0 ? (custo / maiorCusto) * plotHeight : 0;
-    const x = left + indice * barSlot + (barSlot - barWidth) / 2;
-    const labelEvery = resultado.periodos.length > 18 ? Math.ceil(resultado.periodos.length / 12) : 1;
-    const label = indice % labelEvery === 0 ? escapeHtml(periodo.periodo.identificador) : '';
-    return `<rect class="chart-bar${custo === maiorCusto ? ' is-highest' : ''}" x="${x.toFixed(2)}" y="${y(custo).toFixed(2)}" width="${barWidth.toFixed(2)}" height="${barHeight.toFixed(2)}" rx="3"><title>${escapeHtml(periodo.periodo.identificador)} · ${formatarDataPtBr(periodo.periodo.data)} · ${money(custo)}</title></rect>
-      <text class="chart-axis-label chart-axis-label-x" x="${(x + barWidth / 2).toFixed(2)}" y="${height - bottom + 24}">${label}</text>`;
-  }).join('');
-  container.innerHTML = `<svg class="period-cost-chart-svg" viewBox="0 0 ${width} ${height}" aria-hidden="true" focusable="false">
-    <text class="chart-axis-title chart-axis-title-y" x="24" y="${top + plotHeight / 2}" transform="rotate(-90 24 ${top + plotHeight / 2})">Custo (R$)</text>
-    ${grid}
-    <line class="chart-axis" x1="${left}" y1="${top}" x2="${left}" y2="${top + plotHeight}" />
-    <line class="chart-axis" x1="${left}" y1="${top + plotHeight}" x2="${width - right}" y2="${top + plotHeight}" />
-    ${bars}
-    <text class="chart-axis-title chart-axis-title-x" x="${left + plotWidth / 2}" y="${height - 12}">Períodos</text>
-  </svg>`;
-}
-
-function formatarValorEixo(value: number): string {
-  if (value >= 1000) return `R$ ${(value / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil`;
-  return `R$ ${Math.round(value).toLocaleString('pt-BR')}`;
-}
-
-function obterAnaliseDeSensibilidade(resultado: ResultadoDeSimulacao): AnaliseDeSensibilidade {
-  const faina = catalogoPortmac.obterFaina(resultado.entrada.faina);
-  const baseEntrada: EntradaDeSimulacao = {
-    ...(resultado.entrada.cliente ? { cliente: resultado.entrada.cliente } : {}),
-    ...(resultado.entrada.custosOpcionais?.length ? { custosOpcionais: resultado.entrada.custosOpcionais } : {}),
-    faina: resultado.entrada.faina,
-    inicio: resultado.entrada.inicio,
-    volumeToneladas: resultado.entrada.volumeToneladas,
-    produtividadeToneladasPorPeriodo: resultado.entrada.produtividadeToneladasPorPeriodo,
-    ...(resultado.entrada.ternosPorPeriodoPadrao ? { ternosPorPeriodoPadrao: resultado.entrada.ternosPorPeriodoPadrao } : {}),
-    totalDeTernos: resultado.entrada.totalDeTernos,
-  };
-  const produtividades = faina?.unidade === 'TON'
-    ? CURVA_OTIMO_FERTILIZANTES.map(([produtividade]) => produtividade)
-    : gerarGradePorPeriodos(baseEntrada);
-  const otimizacao = otimizarCenario(baseEntrada, catalogoPortmac, calendarioOperacional, produtividades);
-  const pontos = otimizacao.candidatos.map((candidato) => ({
-    produtividade: candidato.produtividade,
-    custoPorTonelada: candidato.resultado.custoPorTonelada,
-    periodos: candidato.periodos,
-  }));
-  const produtividadeBase = baseEntrada.produtividadeToneladasPorPeriodo;
-  const candidatoAtual = produtividadeBase > 0 && pontos.some((ponto) => ponto.produtividade === produtividadeBase)
-    ? undefined
-    : {
-      produtividade: produtividadeBase,
-      custoPorTonelada: resultado.custoPorTonelada,
-      periodos: resultado.quantidadeDePeriodos,
-      ehCenarioAtual: true,
-    };
-  return {
-    pontos: candidatoAtual ? [...pontos, candidatoAtual].sort((a, b) => a.produtividade - b.produtividade) : pontos,
-    otimizacao,
-  };
-}
-
-function gerarGradePorPeriodos(entrada: EntradaDeSimulacao): readonly number[] {
-  // Para unidades sem uma faixa documental de produtividade, a grade de
-  // períodos é fixa. Ela não pode ser derivada do cenário-base.
-  const periodoMinimo = 1;
-  const periodoMaximo = 36;
-  return Array.from({ length: periodoMaximo - periodoMinimo + 1 }, (_, indice) => {
-    const periodos = periodoMinimo + indice;
-    const ternosPorPeriodo = entrada.ternosPorPeriodoPadrao ?? 1;
-    return Number((entrada.volumeToneladas / (periodos * ternosPorPeriodo)).toFixed(2));
-  });
-}
-
-function renderProductivitySensitivity(resultado: ResultadoDeSimulacao): void {
-  const container = document.querySelector<HTMLDivElement>('#productivity-sensitivity-body');
-  const summary = document.querySelector<HTMLElement>('#productivity-sensitivity-summary');
-  if (!container) return;
-  const analise = obterAnaliseDeSensibilidade(resultado);
-  const pontos = analise.pontos;
-  const base = resultado.entrada.produtividadeToneladasPorPeriodo;
-  const pontosDoGrafico = pontos.filter((ponto) => !ponto.ehCenarioAtual);
-  const produtividades = pontosDoGrafico.map((ponto) => ponto.produtividade);
-  const unidade = unidadeDaFaina(catalogoPortmac.obterFaina(resultado.entrada.faina)?.unidade);
-  const pontoOtimo = analise.otimizacao.melhor;
-  if (!pontosDoGrafico.length || !pontoOtimo) {
-    if (summary) summary.textContent = 'ótimo indisponível';
-    container.innerHTML = '<p class="sensitivity-empty">Não foi possível gerar cenários comparativos para esta operação.</p>';
-    return;
+function renderCharts(resultado: ResultadoDeSimulacao): void {
+  const periodChartContainer = document.querySelector<HTMLDivElement>('#period-cost-chart-body');
+  const periodChartSummary = document.querySelector<HTMLElement>('#period-cost-chart-summary');
+  if (periodChartContainer && periodChartSummary) {
+    const { svgHtml, summaryText, ariaLabel } = gerarGraficoCustoPeriodos(resultado);
+    periodChartSummary.textContent = summaryText;
+    periodChartContainer.setAttribute('role', 'img');
+    periodChartContainer.setAttribute('aria-label', ariaLabel);
+    periodChartContainer.innerHTML = svgHtml;
   }
-  if (summary) {
+
+  const sensitivityContainer = document.querySelector<HTMLDivElement>('#productivity-sensitivity-body');
+  const sensitivitySummary = document.querySelector<HTMLElement>('#productivity-sensitivity-summary');
+  if (sensitivityContainer) {
+    const faina = catalogoPortmac.obterFaina(resultado.entrada.faina);
+    const unidade = obterUnidade(faina?.unidade);
+    const analise = obterAnaliseDeSensibilidade(resultado, catalogoPortmac, calendarioOperacional);
     const ternosPorPeriodo = resultado.entrada.ternosPorPeriodoPadrao
       ?? (resultado.quantidadeDePeriodos ? resultado.entrada.totalDeTernos / resultado.quantidadeDePeriodos : 0);
-    summary.textContent = `Ótimo calculado: ${number(pontoOtimo.produtividade)} ${unidade.abreviacao}/terno/período · ${number(pontoOtimo.periodos)} períodos · ${number(ternosPorPeriodo)} terno(s)/período · ${money(pontoOtimo.resultado.custoPorTonelada)} por ${unidade.singular}`;
+    const dados = gerarGraficoSensibilidade(
+      analise,
+      resultado.entrada.produtividadeToneladasPorPeriodo,
+      resultado.custoPorTonelada,
+      ternosPorPeriodo,
+      unidade,
+    );
+    if (!dados) {
+      if (sensitivitySummary) sensitivitySummary.textContent = 'ótimo indisponível';
+      sensitivityContainer.innerHTML = '<p class="sensitivity-empty">Não foi possível gerar cenários comparativos para esta operação.</p>';
+    } else {
+      if (sensitivitySummary) sensitivitySummary.textContent = dados.summaryText;
+      sensitivityContainer.setAttribute('role', 'img');
+      sensitivityContainer.setAttribute('aria-label', dados.ariaLabel);
+      sensitivityContainer.innerHTML = `${dados.svgHtml}${dados.tabelaHtml}`;
+    }
   }
-  const custos = pontosDoGrafico.map((ponto) => ponto.custoPorTonelada);
-  const menorCusto = Math.min(...custos);
-  const maiorCusto = Math.max(...custos);
-  const custoBase = pontos.find((ponto) => ponto.produtividade === base)?.custoPorTonelada ?? resultado.custoPorTonelada;
-  const amplitude = Math.max(maiorCusto - menorCusto, custoBase * .12, 1);
-  const yMin = Math.max(0, menorCusto - amplitude * .16);
-  const yMax = maiorCusto + amplitude * .16;
-  const width = 860;
-  const height = 340;
-  const left = 120;
-  const right = 24;
-  const top = 24;
-  const bottom = 72;
-  const plotWidth = width - left - right;
-  const plotHeight = height - top - bottom;
-  const x = (value: number) => left + (produtividades.length > 1 ? (value - produtividades[0]!) / (produtividades[produtividades.length - 1]! - produtividades[0]!) : .5) * plotWidth;
-  const y = (value: number) => top + plotHeight - ((value - yMin) / (yMax - yMin)) * plotHeight;
-  const labelEvery = pontosDoGrafico.length > 18 ? Math.ceil(pontosDoGrafico.length / 8) : 1;
-  const pontosDaTabela = pontos.filter((ponto, indice) => indice % 4 === 0 || ponto.produtividade === base || ponto.produtividade === pontoOtimo.produtividade);
-  const grid = Array.from({ length: 5 }, (_, indice) => {
-    const value = yMin + ((yMax - yMin) / 4) * indice;
-    const lineY = y(value);
-    return `<line class="chart-grid-line" x1="${left}" y1="${lineY.toFixed(2)}" x2="${width - right}" y2="${lineY.toFixed(2)}" />
-      <text class="chart-axis-label chart-axis-label-y" x="${left - 12}" y="${(lineY + 4).toFixed(2)}">${escapeHtml(formatarValorEixo(value))}</text>`;
-  }).join('');
-  const line = pontosDoGrafico.map((ponto, indice) => `${indice === 0 ? 'M' : 'L'} ${x(ponto.produtividade).toFixed(2)} ${y(ponto.custoPorTonelada).toFixed(2)}`).join(' ');
-  const optimalGuide = `<line class="sensitivity-optimal-guide" x1="${x(pontoOtimo.produtividade).toFixed(2)}" y1="${top}" x2="${x(pontoOtimo.produtividade).toFixed(2)}" y2="${top + plotHeight}" /><text class="sensitivity-optimal-guide-label" x="${x(pontoOtimo.produtividade).toFixed(2)}" y="${top - 7}">ótimo</text>`;
-  const points = pontosDoGrafico.map((ponto, indice) => `<circle class="sensitivity-point${ponto.produtividade === pontoOtimo.produtividade ? ' is-optimal' : ''}" cx="${x(ponto.produtividade).toFixed(2)}" cy="${y(ponto.custoPorTonelada).toFixed(2)}" r="6"><title>${number(ponto.produtividade)} / terno / período · ${number(ponto.periodos)} períodos · ${money(ponto.custoPorTonelada)} por ${unidade.singular}</title></circle>
-    <text class="chart-axis-label chart-axis-label-x" x="${x(ponto.produtividade).toFixed(2)}" y="${height - bottom + 24}">${indice % labelEvery === 0 ? escapeHtml(number(ponto.produtividade)) : ''}</text>`).join('');
-  container.setAttribute('role', 'img');
-  container.setAttribute('aria-label', `Análise de sensibilidade. O custo por ${unidade.singular} varia de ${money(menorCusto)} a ${money(maiorCusto)}. O ótimo estimado é ${number(pontoOtimo.produtividade)} ${unidade.abreviacao} por terno por período.`);
-  container.innerHTML = `<svg class="period-cost-chart-svg sensitivity-chart-svg" viewBox="0 0 ${width} ${height}" aria-hidden="true" focusable="false">
-    <text class="chart-axis-title chart-axis-title-y" x="24" y="${top + plotHeight / 2}" transform="rotate(-90 24 ${top + plotHeight / 2})">Custo por ${escapeHtml(unidade.singular)} (R$)</text>
-    ${grid}
-    <line class="chart-axis" x1="${left}" y1="${top}" x2="${left}" y2="${top + plotHeight}" />
-    <line class="chart-axis" x1="${left}" y1="${top + plotHeight}" x2="${width - right}" y2="${top + plotHeight}" />
-    ${optimalGuide}
-    <path class="sensitivity-line" d="${line}" />
-    ${points}
-    <text class="chart-axis-title chart-axis-title-x" x="${left + plotWidth / 2}" y="${height - 12}">Produtividade / terno / período</text>
-  </svg>
-  <div class="sensitivity-table-wrap"><table class="sensitivity-table"><thead><tr><th>Produtividade / terno / período</th><th>Períodos</th><th>Custo por ${escapeHtml(unidade.singular)}</th></tr></thead><tbody>
-    ${pontosDaTabela.map((ponto) => `<tr class="${ponto.produtividade === base ? 'is-base' : ''}${ponto.produtividade === pontoOtimo.produtividade ? ' is-optimal' : ''}"><td>${number(ponto.produtividade)}${ponto.produtividade === base ? ' <span class="sensitivity-base-label">base</span>' : ''}${ponto.produtividade === pontoOtimo.produtividade ? ' <span class="sensitivity-optimal-label">ótimo</span>' : ''}</td><td>${number(ponto.periodos)}</td><td>${money(ponto.custoPorTonelada)}</td></tr>`).join('')}
-  </tbody></table></div>`;
 }
 
-function saveCurrentBudget(): void {
+function handleSaveBudget(): void {
   if (!currentResult) return;
   const cliente = currentResult.entrada.cliente?.trim();
   const saveHint = document.querySelector<HTMLElement>('#save-budget-hint');
@@ -590,97 +273,13 @@ function saveCurrentBudget(): void {
     saveHint?.replaceChildren(document.createTextNode('Informe o cliente nos dados da operação para salvar'));
     return;
   }
-  const budgets = readSavedBudgets();
-  budgets.unshift({
-    id: `orcamento-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    cliente,
-    criadoEm: new Date().toISOString(),
-    resultado: currentResult,
-  });
-  localStorage.setItem(SAVED_BUDGETS_KEY, JSON.stringify(budgets));
+  saveBudget(currentResult, cliente);
   if (saveHint) saveHint.textContent = 'Orçamento salvo no cadastro do cliente';
   const button = document.querySelector<HTMLButtonElement>('#save-budget');
   if (button) {
     button.textContent = 'Orçamento salvo';
     button.disabled = true;
   }
-}
-
-function readSavedBudgets(): OrcamentoSalvo[] {
-  try {
-    const stored = JSON.parse(localStorage.getItem(SAVED_BUDGETS_KEY) ?? '[]') as unknown;
-    return Array.isArray(stored) ? stored.filter(isOrcamentoSalvo) : [];
-  } catch {
-    return [];
-  }
-}
-
-function printSavedBudget(id?: string): void {
-  if (!id) return;
-  const budget = readSavedBudgets().find((item) => item.id === id);
-  if (!budget) return;
-  const faina = catalogoPortmac.obterFaina(budget.resultado.entrada.faina);
-  const unidade = unidadeDaFaina(faina?.unidade);
-  const analise = obterAnaliseDeSensibilidade(budget.resultado);
-  const sensibilidade = analise.pontos;
-  const produtividadeBase = budget.resultado.entrada.produtividadeToneladasPorPeriodo;
-  const pontoOtimo = analise.otimizacao.melhor;
-  const report = document.createElement('section');
-  report.className = 'print-report';
-  report.innerHTML = `<header class="print-report-header">
-    <img src="/brand/portmac-blue.png" alt="PORTMAC" />
-    <div><span>SIMULAÇÃO DE CUSTO DE OPERAÇÃO</span><strong>Orçamento salvo</strong></div>
-  </header>
-  <div class="print-report-client"><span>Cliente</span><strong>${escapeHtml(budget.cliente)}</strong><small>Gerado em ${escapeHtml(formatarDataHora(budget.criadoEm))}</small></div>
-  <h1>${escapeHtml(faina?.descricao ?? budget.resultado.entrada.faina)}</h1>
-  <p class="print-report-source">${escapeHtml(faina?.fonte ?? 'SCO')} · ${escapeHtml(faina?.vigencia ?? 'provisório')} · ${escapeHtml(faina?.referencia ?? '')}</p>
-  <section class="print-report-primary-cost"><span>Custo por ${escapeHtml(unidade.singular)}</span><strong>${money(budget.resultado.custoPorTonelada)}</strong></section>
-  <section class="print-report-section"><h2>Dados da operação</h2><div class="print-report-grid">
-    <div><span>Início</span><strong>${formatarDataPtBr(budget.resultado.entrada.inicio.data)} · ${escapeHtml(budget.resultado.entrada.inicio.periodo)}</strong></div>
-    <div><span>Quantidade</span><strong>${number(budget.resultado.entrada.volumeToneladas)} ${unidade.abreviacao}</strong></div>
-    <div><span>Produtividade-base</span><strong>${number(budget.resultado.entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/terno/período</strong></div>
-    <div><span>Períodos</span><strong>${number(budget.resultado.quantidadeDePeriodos)}</strong></div>
-    <div><span>Ternos por período</span><strong>${number(budget.resultado.entrada.ternosPorPeriodoPadrao ?? (budget.resultado.quantidadeDePeriodos ? budget.resultado.entrada.totalDeTernos / budget.resultado.quantidadeDePeriodos : 0))}</strong></div>
-    <div><span>Total de ternos</span><strong>${number(budget.resultado.entrada.totalDeTernos)}</strong></div>
-    <div><span>Custo total</span><strong>${money(budget.resultado.custoTotal)}</strong></div>
-  </div></section>
-  <section class="print-report-section"><h2>Composição por período</h2><div class="saved-period-table-wrap"><table class="saved-period-table"><thead><tr><th>Data</th><th>Período</th><th>Produtividade / terno</th><th>Produção</th><th>Ternos</th><th>Majoração</th><th>Custo</th></tr></thead><tbody>
-    ${budget.resultado.periodos.map((periodo, indice) => `<tr><td>${formatarDataPtBr(periodo.periodo.data)}</td><td>${escapeHtml(periodo.periodo.identificador)}</td><td>${number(budget.resultado.entrada.produtividadesPorPeriodo?.[indice] ?? budget.resultado.entrada.produtividadeToneladasPorPeriodo)} ${unidade.abreviacao}/terno</td><td>${number(periodo.producaoToneladas)} ${unidade.abreviacao}</td><td>${number(periodo.ternos)}</td><td>${escapeHtml(periodo.custo.majoracao?.descricao ?? 'preço normal')}</td><td>${money(periodo.custo.total)}</td></tr>`).join('')}
-  </tbody></table></div></section>
-  <section class="print-report-section"><h2>Sensibilidade à produtividade</h2><p class="print-report-note">Comparação do custo por ${escapeHtml(unidade.singular)} em cenários automáticos de produtividade por terno e por período${pontoOtimo ? ` · ótimo calculado em ${number(pontoOtimo.produtividade)} ${unidade.abreviacao}/terno/período, com ${number(pontoOtimo.periodos)} períodos` : ''}.</p><div class="print-memory">${sensibilidade.map((ponto) => `<div><span>${number(ponto.produtividade)} ${unidade.abreviacao}/terno/período · ${number(ponto.periodos)} períodos${ponto.produtividade === produtividadeBase ? ' · base' : ''}${pontoOtimo && ponto.produtividade === pontoOtimo.produtividade ? ' · ótimo' : ''}</span><strong>${money(ponto.custoPorTonelada)}</strong></div>`).join('')}</div></section>
-  <section class="print-report-section"><h2>Memória por período</h2><div class="print-period-memory">
-    ${budget.resultado.periodos.map((periodo) => `<div class="print-period-memory-block"><h3>${formatarDataPtBr(periodo.periodo.data)} · ${escapeHtml(periodo.periodo.identificador)} · ${money(periodo.custo.total)}</h3>${periodo.custo.memoria.map((linha) => `<div><span>${escapeHtml(linha.descricao)}</span><strong>${money(linha.valor)}</strong></div>`).join('')}</div>`).join('')}
-  </div></section>
-  ${budget.resultado.custosOpcionais.length ? `<section class="print-report-section"><h2>Custos opcionais</h2><div class="print-memory">${budget.resultado.custosOpcionais.map((custo) => {
-    const label = custo.tipo === 'OUTRO' ? custo.descricao?.trim() || optionalCostLabels.OUTRO : optionalCostLabels[custo.tipo];
-    return `<div><span>${escapeHtml(label)}</span><strong>${money(custo.custoTotal)}</strong></div>`;
-  }).join('')}</div></section>` : ''}
-  <section class="print-report-section"><h2>Memória de cálculo</h2><div class="print-memory">${budget.resultado.memoria.map((linha) => `<div><span>${escapeHtml(linha.descricao)}</span><strong>${money(linha.valor)}</strong></div>`).join('')}</div></section>
-  <footer class="print-report-footer">PORTMAC · simulador de custo de operação · documento preliminar</footer>`;
-  document.body.appendChild(report);
-  document.body.classList.add('printing-budget');
-  const cleanup = () => {
-    document.body.classList.remove('printing-budget');
-    report.remove();
-    window.removeEventListener('afterprint', cleanup);
-  };
-  window.addEventListener('afterprint', cleanup);
-  window.print();
-}
-
-function isOrcamentoSalvo(value: unknown): value is OrcamentoSalvo {
-  if (!value || typeof value !== 'object') return false;
-  const record = value as Record<string, unknown>;
-  return typeof record.id === 'string'
-    && typeof record.cliente === 'string'
-    && typeof record.criadoEm === 'string'
-    && typeof record.resultado === 'object'
-    && record.resultado !== null;
-}
-
-function formatarDataHora(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
 function applyPeriodDetails(): void {
@@ -691,7 +290,8 @@ function applyPeriodDetails(): void {
   const totalTernosEsperado = totalTernosCalculado();
   draftDistribution = ternos;
   draftProductivities = produtividades;
-  renderDistributionTotals(produtividades, ternos);
+  const unidade = obterUnidade(catalogoPortmac.obterFaina(fainaCodeInput.value)?.unidade);
+  renderDistributionTotals(produtividades, ternos, volume, totalTernosEsperado, unidade.abreviacao);
   if (ternos.some((value) => !Number.isInteger(value) || value < 0 || value > 4)) {
     showDistributionError('Cada período deve ter entre 0 e 4 ternos.');
     return;
@@ -708,7 +308,7 @@ function applyPeriodDetails(): void {
     showDistributionError('Cada produtividade por período deve ser maior que zero.');
     return;
   }
-  const totalVolumeDistribuido = volumeDistribuidoPorPeriodos(produtividades, ternos);
+  const totalVolumeDistribuido = volumeDistribuidoPorPeriodos(produtividades, ternos, volume);
   if (!quaseIgual(totalVolumeDistribuido, volume)) {
     showDistributionError(`O volume distribuído é ${number(totalVolumeDistribuido)}; ele precisa ser exatamente ${number(volume)}.`);
     return;
@@ -728,7 +328,7 @@ function renderTernosEditor(resultado?: ResultadoDeSimulacao): void {
   const totalTernos = totalTernosCalculado();
   if (resultado) draftDistribution = resultado.distribuicaoDeTernos;
   if (draftDistribution.length !== periodos.length || draftDistribution.reduce((soma, ternos) => soma + ternos, 0) !== totalTernos) {
-    draftDistribution = distribuirTernosLocal(totalTernos, periodos.length);
+    draftDistribution = distribuirTernos(totalTernos, periodos.length);
   }
   const produtividadeBase = numberOf('#produtividade');
   if (resultado) {
@@ -739,7 +339,7 @@ function renderTernosEditor(resultado?: ResultadoDeSimulacao): void {
   if (
     draftProductivities.length !== periodos.length
     || draftProductivities.some((produtividade) => !Number.isFinite(produtividade) || produtividade <= 0)
-    || !quaseIgual(volumeDistribuidoPorPeriodos(draftProductivities, draftDistribution), volume)
+    || !quaseIgual(volumeDistribuidoPorPeriodos(draftProductivities, draftDistribution, volume), volume)
   ) {
     draftProductivities = periodos.length && produtividadeBase > 0 && Number.isFinite(totalTernos)
       ? Array.from({ length: periodos.length }, () => produtividadeBase)
@@ -750,7 +350,8 @@ function renderTernosEditor(resultado?: ResultadoDeSimulacao): void {
     ? `${number(totalTernos)} ${totalTernos === 1 ? 'terno' : 'ternos'}`
     : 'total de ternos pendente';
   setText('#ternos-editor-count', `${periodos.length} ${periodos.length === 1 ? 'período' : 'períodos'} · ${totalTernosLabel}`);
-  renderDistributionTotals(draftProductivities, draftDistribution);
+  const unidade = obterUnidade(catalogoPortmac.obterFaina(fainaCodeInput.value)?.unidade);
+  renderDistributionTotals(draftProductivities, draftDistribution, volume, totalTernos, unidade.abreviacao);
   if (!periodos.length) {
     ternosEditorStatus.textContent = 'Informe volume, produtividade e data válidos para detalhar os períodos.';
     ternosEditorStatus.hidden = false;
@@ -762,8 +363,6 @@ function renderTernosEditor(resultado?: ResultadoDeSimulacao): void {
     ? `O máximo é ${periodos.length * 4} ternos para ${periodos.length} períodos.`
     : '';
   ternosEditorStatus.hidden = !excedeLimite;
-  const faina = catalogoPortmac.obterFaina(fainaCodeInput.value);
-  const unidade = unidadeDaFaina(faina?.unidade);
   ternosEditorBody.innerHTML = periodos.map((periodo, indice) => {
     const calculado = resultado?.periodos[indice];
     const ternos = draftDistribution[indice] ?? 0;
@@ -825,53 +424,6 @@ function projetarPeriodosDoFormulario(): readonly PeriodoOgmo[] {
   } catch {
     return [];
   }
-}
-
-function distribuirTernosLocal(total: number, periodos: number): readonly number[] {
-  if (periodos <= 0 || !Number.isFinite(total)) return [];
-  const base = Math.floor(total / periodos);
-  const sobras = total % periodos;
-  return Array.from({ length: periodos }, (_, indice) => base + (indice >= periodos - sobras ? 1 : 0));
-}
-
-function quaseIgual(a: number, b: number): boolean {
-  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= 0.0001;
-}
-
-function renderDistributionTotals(
-  produtividades: readonly number[],
-  ternos: readonly number[],
-  abreviacao?: string,
-): void {
-  const volume = numberOf('#volume');
-  const totalVolume = volumeDistribuidoPorPeriodos(produtividades, ternos);
-  const totalTernos = ternos.reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
-  const totalTernosEsperado = totalTernosCalculado();
-  const unidade = abreviacao ?? unidadeDaFaina(catalogoPortmac.obterFaina(fainaCodeInput.value)?.unidade).abreviacao;
-  ternosEditorVolumeTotal.textContent = `${number(totalVolume)} ${unidade}`;
-  ternosEditorVolumeTarget.textContent = `${number(volume)} ${unidade}`;
-  ternosEditorTernosTotal.textContent = number(totalTernos);
-  ternosEditorTernosTarget.textContent = Number.isFinite(totalTernosEsperado) ? number(totalTernosEsperado) : '—';
-  ternosEditorVolumeTotal.parentElement?.classList.toggle('is-valid', quaseIgual(totalVolume, volume));
-  ternosEditorTernosTotal.parentElement?.classList.toggle('is-valid', totalTernos === totalTernosEsperado);
-}
-
-function volumeDistribuidoPorPeriodos(
-  produtividades: readonly number[],
-  ternos: readonly number[],
-): number {
-  let restante = numberOf('#volume');
-  let total = 0;
-  produtividades.forEach((produtividade, indice) => {
-    if (!Number.isFinite(produtividade) || produtividade <= 0) return;
-    const quantidadeDeTernos = ternos[indice] ?? Number.NaN;
-    if (!Number.isFinite(quantidadeDeTernos) || quantidadeDeTernos < 0) return;
-    const capacidade = produtividade * quantidadeDeTernos;
-    const producao = Math.min(capacidade, Math.max(0, restante));
-    total += producao;
-    restante -= producao;
-  });
-  return total;
 }
 
 function renderFainaOptions(): void {
@@ -1022,12 +574,14 @@ function updateOptionalCostInput(toggle: HTMLInputElement): void {
 
 function renderOptionalCostLines(resultado: ResultadoDeSimulacao): void {
   const lines = document.querySelector<HTMLDivElement>('#optional-cost-lines')!;
+  const faina = catalogoPortmac.obterFaina(resultado.entrada.faina);
+  const unidade = obterUnidade(faina?.unidade);
   lines.innerHTML = resultado.custosOpcionais.length
     ? resultado.custosOpcionais.map((custo) => {
-      const label = custo.tipo === 'OUTRO' ? custo.descricao?.trim() || optionalCostLabels.OUTRO : optionalCostLabels[custo.tipo];
+      const label = custo.tipo === 'OUTRO' ? custo.descricao?.trim() || OPTIONAL_COST_LABELS.OUTRO : OPTIONAL_COST_LABELS[custo.tipo];
       return `
         <div class="cost-line cost-line-optional">
-          <div><span>${escapeHtml(label)}</span><small>${money(custo.custoPorTonelada)} / ${unidadeDaFaina(catalogoPortmac.obterFaina(resultado.entrada.faina)?.unidade).abreviacao}</small></div>
+          <div><span>${escapeHtml(label)}</span><small>${money(custo.custoPorTonelada)} / ${unidade.abreviacao}</small></div>
           <strong>${money(custo.custoTotal)}</strong>
         </div>
       `;
@@ -1037,7 +591,7 @@ function renderOptionalCostLines(resultado: ResultadoDeSimulacao): void {
 
 function renderCalculationMemory(resultado: ResultadoDeSimulacao): void {
   const container = document.querySelector<HTMLDivElement>('#calculation-memory-lines')!;
-  const unidade = unidadeDaFaina(catalogoPortmac.obterFaina(resultado.entrada.faina)?.unidade);
+  const unidade = obterUnidade(catalogoPortmac.obterFaina(resultado.entrada.faina)?.unidade);
   const summary = resultado.memoria.map((linha, indice) => `
     <div class="memory-line">
       <span>${escapeHtml(linha.descricao)}</span>
@@ -1086,21 +640,6 @@ function renderCalculationMemory(resultado: ResultadoDeSimulacao): void {
   `;
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  })[character]!);
-}
-
-function showDistributionError(message: string): void {
-  ternosEditorStatus.textContent = message;
-  ternosEditorStatus.hidden = false;
-}
-
 function updateCalculatedPeriods(): void {
   const volume = Number(volumeInput.value);
   const productivity = Number(productivityInput.value);
@@ -1128,32 +667,13 @@ function totalTernosCalculado(): number {
   return quantidadeDePeriodos * ternosPorPeriodo;
 }
 
-function valueOf<T extends HTMLInputElement | HTMLSelectElement>(selector: string): string {
-  return document.querySelector<T>(selector)!.value;
-}
-
-function numberOf(selector: string): number { return Number(valueOf<HTMLInputElement>(selector)); }
-function setText(selector: string, value: string): void { document.querySelector<HTMLElement>(selector)!.textContent = value; }
-function number(value: number): string { return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(value); }
-function money(value: number): string { return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
-function normalizarBusca(value: string | undefined): string {
-  return (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-}
-function unidadeDaFaina(unidade?: string): { singular: string; abreviacao: string } {
-  switch (unidade) {
-    case 'UNIDADE': return { singular: 'unidade', abreviacao: 'unid.' };
-    case 'CONTAINER': return { singular: 'container', abreviacao: 'contêiner(es)' };
-    case 'EQUIPE': return { singular: 'equipe', abreviacao: 'equipe(s)' };
-    case 'VOLUME': return { singular: 'volume', abreviacao: 'volume(s)' };
-    default: return { singular: 'tonelada', abreviacao: 'ton' };
-  }
-}
 function updateOperationUnitLabels(): void {
   const faina = catalogoPortmac.obterFaina(fainaCodeInput.value);
-  const unidade = unidadeDaFaina(faina?.unidade);
-  const nome = unidade.abreviacao === 'TON' ? 'Volume do navio' : 'Quantidade do navio';
+  const unidade = obterUnidade(faina?.unidade);
+  const nome = unidade.abreviacao === 'ton' ? 'Volume do navio' : 'Quantidade do navio';
   document.querySelector<HTMLElement>('#volume-field-label')!.innerHTML = `${nome} <b>${unidade.abreviacao}</b>`;
   document.querySelector<HTMLElement>('#productivity-field-label')!.innerHTML = `Capacidade <b>${unidade.abreviacao} / período</b>`;
 }
+
 function clearError(): void { errorBox.hidden = true; errorBox.textContent = ''; }
 function showError(message: string): void { errorBox.textContent = message; errorBox.hidden = false; }

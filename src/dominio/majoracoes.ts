@@ -89,7 +89,7 @@ export function obterMajoracaoDoPeriodo(entrada: EntradaDeMajoracao): MajoracaoD
   };
 }
 
-function descricaoDoAdicional(percentual: number): string {
+export function descricaoDoAdicional(percentual: number): string {
   if (percentual === 0) return 'preço normal';
   return `+${formatarPercentual(percentual)} de aumento`;
 }

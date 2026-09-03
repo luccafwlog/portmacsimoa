@@ -5,27 +5,19 @@ import type {
   RegraDeComposicaoProvisoria,
 } from '../dominio/tipos.js';
 import type { CatalogoOgmo } from './portas.js';
-import { obterMajoracaoDoPeriodo } from '../dominio/majoracoes.js';
+import { descricaoDoAdicional, obterMajoracaoDoPeriodo } from '../dominio/majoracoes.js';
 import { fainasActProvisorias } from './act-provisorio.js';
-
-export interface RegraDeCustoPorTonelada {
-  /** Taxa total da estiva por tonelada e por cota, sem homens extras. */
-  readonly taxaEstivaPorTonelada: number;
-  /** Soma das cotas da equipe básica de estiva por terno. */
-  readonly cotasEstivaPorTerno: number;
-  /** Taxa total da equipe de conferentes por tonelada. */
-  readonly taxaConferentesPorTonelada: number;
-}
+import { fainasCctIniciais } from './cct.js';
 
 export interface RegistroDeFaina extends FainaCatalogada {
-  readonly regra?: RegraDeCustoPorTonelada;
-  readonly regraCctProvisoria?: RegraDeComposicaoProvisoria;
+  readonly regra?: RegraDeComposicaoProvisoria;
+  /** @deprecated Mantido para compatibilidade com testes e transição */
   readonly regraActProvisoria?: RegraDeComposicaoProvisoria;
+  /** @deprecated Mantido para compatibilidade com testes e transição */
+  readonly regraCctProvisoria?: RegraDeComposicaoProvisoria;
 }
 
-/** A CCT ativa no simulador é o mapeamento provisório exclusivo da planilha. */
-export { fainasCctIniciais } from './cct.js';
-import { fainasCctIniciais } from './cct.js';
+export { fainasCctIniciais };
 
 export class CatalogoPortmac implements CatalogoOgmo {
   constructor(
@@ -57,47 +49,11 @@ export class CatalogoPortmac implements CatalogoOgmo {
     if (!faina) {
       throw new Error(`Faina ${contexto.faina.codigo} não está no catálogo.`);
     }
-    const regraProvisoria = faina.regraActProvisoria ?? faina.regraCctProvisoria;
+    const regraProvisoria = faina.regra ?? faina.regraActProvisoria ?? faina.regraCctProvisoria;
     if (regraProvisoria) {
       return calcularCustoComposicaoProvisoria(contexto, faina, regraProvisoria);
     }
-    if (faina.status === 'PENDENTE_DE_VALIDACAO' || !faina.regra) {
-      throw new Error(`A faina ${faina.descricao} ainda está pendente de validação.`);
-    }
-
-    const majoracao = contexto.majoracao ?? obterMajoracaoDoPeriodo({
-      data: contexto.periodo.data,
-      periodo: contexto.periodo.identificador,
-      fonte: faina.fonte,
-    });
-    const custoEstivaBase =
-      contexto.producaoToneladas *
-      faina.regra.taxaEstivaPorTonelada *
-      faina.regra.cotasEstivaPorTerno;
-    const custoConferentesBase =
-      contexto.producaoToneladas * faina.regra.taxaConferentesPorTonelada;
-    const custoEstiva = custoEstivaBase * majoracao.fator;
-    const custoConferentes = custoConferentesBase * majoracao.fator;
-    const total = custoEstiva + custoConferentes;
-
-    return {
-      total,
-      majoracao,
-      memoria: [
-        {
-          descricao: `Estiva · ${faina.regra.taxaEstivaPorTonelada.toFixed(2)} × ${faina.regra.cotasEstivaPorTerno.toString().replace('.', ',')} cotas/terno · ${descricaoDoAdicional(majoracao.adicionalPercentual)}`,
-          valor: custoEstiva,
-        },
-        {
-          descricao: `Conferentes · ${faina.regra.taxaConferentesPorTonelada.toFixed(2)} por tonelada · ${descricaoDoAdicional(majoracao.adicionalPercentual)}`,
-          valor: custoConferentes,
-        },
-        {
-          descricao: `Fonte: ${faina.fonte} · ${faina.referencia} · ${majoracao.descricao}`,
-          valor: total,
-        },
-      ],
-    };
+    throw new Error(`A faina ${faina.descricao} ainda está pendente de validação.`);
   }
 
   private obterRegistro(codigo: string): RegistroDeFaina | undefined {
@@ -147,11 +103,6 @@ function calcularCustoComposicaoProvisoria(
       },
     ],
   };
-}
-
-function descricaoDoAdicional(percentual: number): string {
-  if (percentual === 0) return 'preço normal';
-  return `+${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(percentual)}% de aumento`;
 }
 
 export const catalogoPortmac = new CatalogoPortmac(

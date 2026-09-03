@@ -8,6 +8,9 @@ import type {
 } from '../dominio/tipos.js';
 import { obterMajoracaoDoPeriodo } from '../dominio/majoracoes.js';
 import { ehFeriadoVilaVelha } from '../calendario/feriados.js';
+import { obterUnidade } from '../dominio/unidade.js';
+
+export const EPSILON_VOLUME = 0.0001;
 
 export class EntradaInvalida extends Error {
   constructor(mensagem: string) {
@@ -47,9 +50,6 @@ export function simular(
     entrada.volumeToneladas / capacidadePorPeriodo,
   );
   if (entrada.ternosPorPeriodoPadrao !== undefined) {
-    if (!Number.isInteger(entrada.ternosPorPeriodoPadrao) || entrada.ternosPorPeriodoPadrao < 1 || entrada.ternosPorPeriodoPadrao > 4) {
-      throw new EntradaInvalida('Os ternos por período devem ser um inteiro entre 1 e 4.');
-    }
     if (entrada.totalDeTernos !== entrada.ternosPorPeriodoPadrao * quantidadeDePeriodos) {
       throw new EntradaInvalida('O total de ternos deve ser igual aos períodos multiplicados pelos ternos por período.');
     }
@@ -102,7 +102,7 @@ export function simular(
       custo,
     };
   });
-  if (restante > 0.0001) {
+  if (restante > EPSILON_VOLUME) {
     throw new EntradaInvalida('A produtividade distribuída não cobre todo o volume da operação.');
   }
 
@@ -113,7 +113,7 @@ export function simular(
   }));
   const custoOpcionalTotal = custosOpcionais.reduce((total, custo) => total + custo.custoTotal, 0);
   const custoTotal = custoDeMaoDeObra + custoOpcionalTotal;
-  const unidadeOperacional = nomeDaUnidade(faina.unidade);
+  const unidadeOperacional = obterUnidade(faina.unidade).plural;
   const memoria: LinhaDeMemoria[] = [
     { descricao: `Quantidade total (${unidadeOperacional})`, valor: entrada.volumeToneladas },
     { descricao: `Produtividade (${unidadeOperacional} por terno por período)`, valor: entrada.produtividadeToneladasPorPeriodo },
@@ -139,16 +139,6 @@ export function simular(
   };
 }
 
-function nomeDaUnidade(unidade: string): string {
-  switch (unidade) {
-    case 'UNIDADE': return 'unidades';
-    case 'CONTAINER': return 'contêineres';
-    case 'EQUIPE': return 'equipes';
-    case 'VOLUME': return 'volumes';
-    default: return 'toneladas';
-  }
-}
-
 function validarEntrada(entrada: EntradaDeSimulacao): void {
   if (!entrada.faina.trim()) throw new EntradaInvalida('A faina é obrigatória.');
   if (entrada.volumeToneladas <= 0) {
@@ -171,7 +161,8 @@ function validarEntrada(entrada: EntradaDeSimulacao): void {
   }
 }
 
-function distribuirTernos(total: number, periodos: number): readonly number[] {
+export function distribuirTernos(total: number, periodos: number): readonly number[] {
+  if (periodos <= 0 || !Number.isFinite(total)) return [];
   const base = Math.floor(total / periodos);
   const sobras = total % periodos;
   return Array.from({ length: periodos }, (_, indice) =>
@@ -211,7 +202,7 @@ function validarProdutividades(
   }
   const capacidade = produtividades.reduce((soma, produtividade, indice) =>
     soma + produtividade * (produtividadePorTerno ? ternosPorPeriodo[indice]! : 1), 0);
-  if (produtividadePorTerno ? capacidade + 0.0001 < volume : Math.abs(capacidade - volume) > 0.0001) {
+  if (produtividadePorTerno ? capacidade + EPSILON_VOLUME < volume : Math.abs(capacidade - volume) > EPSILON_VOLUME) {
     throw new EntradaInvalida(produtividadePorTerno
       ? 'A capacidade das produtividades por terno deve cobrir todo o volume da operação.'
       : 'A soma das produtividades por período deve ser exatamente igual ao volume da operação.');

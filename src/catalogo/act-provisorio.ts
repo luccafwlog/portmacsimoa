@@ -52,23 +52,27 @@ function codigoInterno(codigo: string): string {
   return `ACT_PROVISORIA_${codigo.replace(/\./g, '_')}`;
 }
 
-export const fainasActProvisorias: readonly RegistroDeFaina[] = DEFINICOES.map((definicao) => ({
-  codigo: codigoInterno(definicao.codigo),
-  codigoDaTabela: definicao.codigo,
-  grupoDaTabela: `ACT PROVISÓRIA · ${definicao.grupo}`,
-  descricao: definicao.descricao,
-  tipoDeCarga: definicao.descricao,
-  unidade: definicao.unidade,
-  fonte: 'ACT',
-  status: 'PROVISORIA',
-  vigencia: '2026/2028',
-  referencia: `Mapeamento provisório · Analise_ACT_PORTMAC_Calculadora_Terno_Portuario.xlsx · ${definicao.codigo} · ${definicao.observacao}`,
-  regraActProvisoria: {
+export const fainasActProvisorias: readonly RegistroDeFaina[] = DEFINICOES.map((definicao) => {
+  const regra = {
     taxaBase: definicao.taxaBase,
-    baseDeCalculo: 'COTAS_DA_EQUIPE',
+    baseDeCalculo: 'COTAS_DA_EQUIPE' as const,
     regime: definicao.regime,
     unidade: definicao.unidade,
     encargosContribuicaoAdicional: ENCARGOS_E_CONTRIBUICOES,
     composicao: definicao.composicao,
-  },
-}));
+  };
+  return {
+    codigo: codigoInterno(definicao.codigo),
+    codigoDaTabela: definicao.codigo,
+    grupoDaTabela: `ACT PROVISÓRIA · ${definicao.grupo}`,
+    descricao: definicao.descricao,
+    tipoDeCarga: definicao.descricao,
+    unidade: definicao.unidade,
+    fonte: 'ACT',
+    status: 'PROVISORIA',
+    vigencia: '2026/2028',
+    referencia: `Mapeamento provisório · Analise_ACT_PORTMAC_Calculadora_Terno_Portuario.xlsx · ${definicao.codigo} · ${definicao.observacao}`,
+    regra,
+    regraActProvisoria: regra,
+  };
+});
