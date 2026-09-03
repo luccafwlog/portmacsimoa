@@ -25,14 +25,14 @@ export function gerarGraficoCustoPeriodos(resultado: ResultadoDeSimulacao): Graf
   const height = 340;
   const left = 120;
   const right = 24;
-  const top = 28;
+  const top = 24;
   const bottom = 72;
   const plotWidth = width - left - right;
   const plotHeight = height - top - bottom;
   const ticks = 4;
   const step = maiorCusto / ticks;
   const barSlot = resultado.periodos.length ? plotWidth / resultado.periodos.length : plotWidth;
-  const barWidth = Math.max(8, Math.min(36, barSlot * 0.58));
+  const barWidth = Math.max(6, Math.min(34, barSlot * 0.58));
   const y = (value: number) => top + plotHeight - (maiorCusto > 0 ? value / maiorCusto : 0) * plotHeight;
 
   const grid = Array.from({ length: ticks + 1 }, (_, indice) => {
@@ -48,22 +48,11 @@ export function gerarGraficoCustoPeriodos(resultado: ResultadoDeSimulacao): Graf
     const x = left + indice * barSlot + (barSlot - barWidth) / 2;
     const labelEvery = resultado.periodos.length > 18 ? Math.ceil(resultado.periodos.length / 12) : 1;
     const label = indice % labelEvery === 0 ? escapeHtml(periodo.periodo.identificador) : '';
-    const isHighest = custo === maiorCusto;
-    return `<rect class="chart-bar${isHighest ? ' is-highest' : ''}" x="${x.toFixed(2)}" y="${y(custo).toFixed(2)}" width="${barWidth.toFixed(2)}" height="${barHeight.toFixed(2)}" rx="4" tabindex="0"><title>${escapeHtml(periodo.periodo.identificador)} · ${formatarDataPtBr(periodo.periodo.data)} · ${money(custo)}</title></rect>
+    return `<rect class="chart-bar${custo === maiorCusto ? ' is-highest' : ''}" x="${x.toFixed(2)}" y="${y(custo).toFixed(2)}" width="${barWidth.toFixed(2)}" height="${barHeight.toFixed(2)}" rx="3"><title>${escapeHtml(periodo.periodo.identificador)} · ${formatarDataPtBr(periodo.periodo.data)} · ${money(custo)}</title></rect>
       <text class="chart-axis-label chart-axis-label-x" x="${(x + barWidth / 2).toFixed(2)}" y="${height - bottom + 24}">${label}</text>`;
   }).join('');
 
   const svgHtml = `<svg class="period-cost-chart-svg" viewBox="0 0 ${width} ${height}" aria-hidden="true" focusable="false">
-    <defs>
-      <linearGradient id="bar-gradient-default" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#0e4877" />
-        <stop offset="100%" stop-color="#062644" />
-      </linearGradient>
-      <linearGradient id="bar-gradient-highest" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#fbbf24" />
-        <stop offset="100%" stop-color="#d97706" />
-      </linearGradient>
-    </defs>
     <text class="chart-axis-title chart-axis-title-y" x="24" y="${top + plotHeight / 2}" transform="rotate(-90 24 ${top + plotHeight / 2})">Custo (R$)</text>
     ${grid}
     <line class="chart-axis" x1="${left}" y1="${top}" x2="${left}" y2="${top + plotHeight}" />
@@ -104,7 +93,7 @@ export function gerarGraficoSensibilidade(
   const height = 340;
   const left = 120;
   const right = 24;
-  const top = 28;
+  const top = 24;
   const bottom = 72;
   const plotWidth = width - left - right;
   const plotHeight = height - top - bottom;
@@ -121,48 +110,20 @@ export function gerarGraficoSensibilidade(
       <text class="chart-axis-label chart-axis-label-y" x="${left - 12}" y="${(lineY + 4).toFixed(2)}">${escapeHtml(formatarValorEixo(value))}</text>`;
   }).join('');
 
-  const linePoints = pontosDoGrafico.map((ponto, indice) => `${indice === 0 ? 'M' : 'L'} ${x(ponto.produtividade).toFixed(2)} ${y(ponto.custoPorTonelada).toFixed(2)}`).join(' ');
-  const xFirst = x(produtividades[0]!).toFixed(2);
-  const xLast = x(produtividades[produtividades.length - 1]!).toFixed(2);
-  const yBottom = (top + plotHeight).toFixed(2);
-  const areaPath = `${linePoints} L ${xLast} ${yBottom} L ${xFirst} ${yBottom} Z`;
-
-  const optimalX = x(pontoOtimo.produtividade).toFixed(2);
-  const optimalGuide = `
-    <line class="sensitivity-optimal-guide" x1="${optimalX}" y1="${top}" x2="${optimalX}" y2="${top + plotHeight}" />
-    <rect class="sensitivity-optimal-badge" x="${(Number(optimalX) - 24).toFixed(2)}" y="${top - 18}" width="48" height="16" rx="4" />
-    <text class="sensitivity-optimal-guide-label" x="${optimalX}" y="${top - 6}">ÓTIMO</text>
-  `;
-
-  const points = pontosDoGrafico.map((ponto, indice) => {
-    const isOptimal = ponto.produtividade === pontoOtimo.produtividade;
-    const isBase = ponto.produtividade === baseProdutividade;
-    const pointClasses = ['sensitivity-point'];
-    if (isOptimal) pointClasses.push('is-optimal');
-    if (isBase) pointClasses.push('is-base');
-    const cx = x(ponto.produtividade).toFixed(2);
-    const cy = y(ponto.custoPorTonelada).toFixed(2);
-    const r = isOptimal ? 8 : (isBase ? 6.5 : 5);
-    return `<circle class="${pointClasses.join(' ')}" cx="${cx}" cy="${cy}" r="${r}" tabindex="0"><title>${number(ponto.produtividade)} / terno / período · ${number(ponto.periodos)} períodos · ${money(ponto.custoPorTonelada)} por ${unidade.singular}</title></circle>
-      <text class="chart-axis-label chart-axis-label-x" x="${cx}" y="${height - bottom + 24}">${indice % labelEvery === 0 ? escapeHtml(number(ponto.produtividade)) : ''}</text>`;
-  }).join('');
+  const line = pontosDoGrafico.map((ponto, indice) => `${indice === 0 ? 'M' : 'L'} ${x(ponto.produtividade).toFixed(2)} ${y(ponto.custoPorTonelada).toFixed(2)}`).join(' ');
+  const optimalGuide = `<line class="sensitivity-optimal-guide" x1="${x(pontoOtimo.produtividade).toFixed(2)}" y1="${top}" x2="${x(pontoOtimo.produtividade).toFixed(2)}" y2="${top + plotHeight}" /><text class="sensitivity-optimal-guide-label" x="${x(pontoOtimo.produtividade).toFixed(2)}" y="${top - 7}">ótimo</text>`;
+  const points = pontosDoGrafico.map((ponto, indice) => `<circle class="sensitivity-point${ponto.produtividade === pontoOtimo.produtividade ? ' is-optimal' : ''}" cx="${x(ponto.produtividade).toFixed(2)}" cy="${y(ponto.custoPorTonelada).toFixed(2)}" r="6"><title>${number(ponto.produtividade)} / terno / período · ${number(ponto.periodos)} períodos · ${money(ponto.custoPorTonelada)} por ${unidade.singular}</title></circle>
+    <text class="chart-axis-label chart-axis-label-x" x="${x(ponto.produtividade).toFixed(2)}" y="${height - bottom + 24}">${indice % labelEvery === 0 ? escapeHtml(number(ponto.produtividade)) : ''}</text>`).join('');
 
   const ariaLabel = `Análise de sensibilidade. O custo por ${unidade.singular} varia de ${money(menorCusto)} a ${money(maiorCusto)}. O ótimo estimado é ${number(pontoOtimo.produtividade)} ${unidade.abreviacao} por terno por período.`;
 
   const svgHtml = `<svg class="period-cost-chart-svg sensitivity-chart-svg" viewBox="0 0 ${width} ${height}" aria-hidden="true" focusable="false">
-    <defs>
-      <linearGradient id="sensitivity-area-gradient" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.25" />
-        <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.01" />
-      </linearGradient>
-    </defs>
     <text class="chart-axis-title chart-axis-title-y" x="24" y="${top + plotHeight / 2}" transform="rotate(-90 24 ${top + plotHeight / 2})">Custo por ${escapeHtml(unidade.singular)} (R$)</text>
     ${grid}
     <line class="chart-axis" x1="${left}" y1="${top}" x2="${left}" y2="${top + plotHeight}" />
     <line class="chart-axis" x1="${left}" y1="${top + plotHeight}" x2="${width - right}" y2="${top + plotHeight}" />
-    <path class="sensitivity-area" d="${areaPath}" fill="url(#sensitivity-area-gradient)" />
     ${optimalGuide}
-    <path class="sensitivity-line" d="${linePoints}" />
+    <path class="sensitivity-line" d="${line}" />
     ${points}
     <text class="chart-axis-title chart-axis-title-x" x="${left + plotWidth / 2}" y="${height - 12}">Produtividade / terno / período</text>
   </svg>`;
