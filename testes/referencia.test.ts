@@ -7,14 +7,14 @@ import {
 } from '../src/calendario/referencia.js';
 import { calendarioOperacional } from '../src/calendario/operacional.js';
 import { CatalogoPortmac, type RegistroDeFaina } from '../src/catalogo/portmac.js';
-import { fainasActProvisorias } from '../src/catalogo/act-provisorio.js';
 import { analisarFainaDeReferencia, volumeDeReferencia } from '../src/motor/referencia.js';
+import { fainaDeProducao, fainaDeSalarioDia } from './fainas-de-teste.js';
 
-const granito = fainasActProvisorias.find((faina) => faina.codigoDaTabela === '3.1')!;
-const peacao = fainasActProvisorias.find((faina) => faina.codigoDaTabela === '14.1.0')!;
+const granito = fainaDeProducao;
+const peacao = fainaDeSalarioDia;
 
 function comPiso(base: RegistroDeFaina, piso: number): RegistroDeFaina {
-  return { ...base, regraActProvisoria: { ...base.regraActProvisoria!, producaoMinimaPorTernoPorPeriodo: piso } };
+  return { ...base, regraAct: { ...base.regraAct!, producaoMinimaPorTernoPorPeriodo: piso } };
 }
 
 function analisar(registro: RegistroDeFaina) {

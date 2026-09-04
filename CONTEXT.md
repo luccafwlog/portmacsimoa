@@ -14,12 +14,11 @@ o custo final nem uma previsão automática da operação.
   cálculo do cenário.
 - **Faina** — a operação que será cotada. Uma simulação trata uma única faina.
   A faina é selecionada do catálogo; o usuário não cria uma faina livremente.
-  A ACT é sempre consultada primeiro. A CCT só é usada quando a faina não
-  estiver prevista na ACT.
+  A ACT é a única fonte documental do catálogo: a CCT foi removida do sistema.
 - **Período** — uma das quatro faixas diárias da operação: `01-07`, `07-13`,
   `13-19` ou `19-01`. Cada período é apresentado junto da sua data de início;
   o período `19-01` termina no dia seguinte. A remuneração do período segue a
-  tabela da ACT/CCT: dia normal preço normal; sábado 07-19 preço normal e
+  tabela da ACT: dia normal preço normal; sábado 07-19 preço normal e
   19-07 +87,5%; domingo 07-19 +87,5% e 19-07 +134,375%; feriado 07-19
   +100% e 19-07 +150%. O adicional é somado ao preço normal.
   Quando o feriado cai no domingo, somente a tabela de feriado é aplicada.
@@ -32,11 +31,12 @@ o custo final nem uma previsão automática da operação.
   manual posterior, preservando o total calculado.
 - **Catálogo do OGMO** — fonte externa dos valores e regras necessários para
   calcular o custo de um período. Cada faina cadastrada mantém sua fonte,
-  vigência e referência documental. O cadastro CCT provisório usa uma única
-  linha por faina da planilha autorizada; levantamentos alternativos ficam fora
-  do catálogo até serem validados. Uma faina transcrita, mas ainda não
-  validada, fica visível no catálogo e fora da simulação. Não existe preço
-  criado pelo usuário.
+  vigência e referência documental. Levantamentos alternativos ficam fora do
+  catálogo até serem validados. Uma faina transcrita, mas ainda não validada,
+  fica visível no catálogo e fora da simulação. Não existe preço criado pelo
+  usuário. **O catálogo está vazio**: o cadastro anterior — CCT inteira e o
+  mapeamento provisório da ACT — foi retirado, o primeiro por decisão de
+  negócio e o segundo por estar incorreto.
 
 ## Fluxo decidido
 
@@ -62,8 +62,7 @@ o custo final nem uma previsão automática da operação.
    cada custo com a remuneração da faixa e do dia. Sábados e domingos são
    identificados pela data; feriados nacionais fixos também são reconhecidos
    automaticamente pelo calendário nacional da aplicação.
-   A resolução da faina segue ACT e, somente quando necessário, CCT. As regras
-   das planilhas ACT/CCT são provisórias e calculam um terno completo.
+   A faina vem sempre da ACT; a regra calcula um terno completo.
 7. O resultado mostra custo total, custo por unidade e memória simples por
    período. O custo final soma a mão de obra aos custos opcionais informados.
 8. O detalhamento por períodos é onde o cenário é desenhado: cada período
@@ -102,8 +101,8 @@ o custo final nem uma previsão automática da operação.
 - **Nova simulação** é a página principal e concentra a montagem do cenário.
 - **Clientes cadastrados** será o ponto de consulta do histórico de simulações
   e orçamentos associados a cada cliente.
-- **Catálogo de fainas** detalha as fainas cadastradas, sua fonte (ACT ou CCT),
-  vigência e regra de cálculo.
+- **Catálogo de fainas** detalha as fainas cadastradas, sua vigência e sua
+  regra de cálculo. A fonte é sempre a ACT.
 - A navegação atual é uma composição simples de páginas no cliente.
 - Os orçamentos salvos ficam no `localStorage` do navegador, agrupados por
   cliente na página de clientes. Não existe banco, sincronização entre
@@ -147,8 +146,9 @@ o custo final nem uma previsão automática da operação.
 ## Produção mínima garantida — pendente
 
 A regra de custo aceita `producaoMinimaPorTernoPorPeriodo`: com um piso, a
-quantidade cobrada é `max(produção, piso × ternos)`. **Nenhuma faina do catálogo
-declara esse valor**, e enquanto isso não mudar o cálculo não aplica piso algum.
+quantidade cobrada é `max(produção, piso × ternos)`. **Nenhuma faina declara
+esse valor** — o catálogo está vazio —, e enquanto isso não mudar o cálculo não
+aplica piso algum.
 
 É esse piso que cria o joelho da curva de custo por produtividade — abaixo dele
 o custo unitário cai como 1/produtividade, acima dele fica plano. A curva de
@@ -158,13 +158,18 @@ essa razão de 1,28 na ponta baixa implica um piso perto de 650 t por terno por
 período. Sem os valores documentais por faina, o simulador não tem como apontar
 um ótimo próprio da faina, e diz isso na análise em vez de inventar um número.
 
-A única faina que menciona o assunto é a ACT 1.1, e para dizer que é uma
-operação *sem* produção mínima.
+## Catálogo vazio — estado atual
 
-O catálogo da aplicação usa provisoriamente o mapeamento da planilha ACT
-2026/2028 para 8 fainas; o mapeamento da planilha CCT
-2024/2026 está habilitado provisoriamente para 41 fainas. Ambos usam composição
-por terno, regime de produção ou salário-dia e encargos/contribuições conforme
-as próprias planilhas. Os levantamentos documentais restantes continuam
-pendentes até a substituição pelos documentos oficiais. Os catálogos falsos dos
-testes servem apenas para validar o motor.
+`src/catalogo/act.ts` exporta uma lista vazia. A CCT saiu do sistema por
+completo (arquivos, tipos, filtro de fonte e tabela de majoração) e o
+mapeamento provisório da ACT foi apagado por estar errado. Sem faina
+cadastrada não há simulação: a interface diz isso no combobox e no catálogo em
+vez de oferecer um número inventado.
+
+O recadastro acrescenta registros em `src/catalogo/act.ts` com `fonte: 'ACT'` e
+uma `regraAct` — taxa-base, regime (produção ou salário-dia), unidade,
+encargos/contribuições e a composição do terno em cotas. Antes de transcrever,
+vale responder o que a auditoria em `docs/auditoria-do-calculo.md` deixou em
+aberto: se a taxa do documento é por cota ou pela equipe inteira. Os catálogos
+falsos dos testes (`testes/fainas-de-teste.ts`) servem apenas para validar o
+motor e não representam nenhuma tabela real.

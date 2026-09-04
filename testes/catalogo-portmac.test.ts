@@ -3,11 +3,16 @@ import { data } from '../src/dominio/tempo.js';
 import type { PeriodoOgmo } from '../src/dominio/tipos.js';
 import {
   CatalogoPortmac,
-  fainasCctIniciais,
+  fainasAct,
   type RegistroDeFaina,
 } from '../src/catalogo/portmac.js';
-import { fainasActProvisorias } from '../src/catalogo/act-provisorio.js';
-import { fainasCctProvisorias } from '../src/catalogo/cct-provisorio.js';
+import {
+  COTAS_DA_CARGA_GERAL,
+  COTAS_DA_PEACAO,
+  ENCARGOS_DE_TESTE,
+  fainaDeProducao,
+  fainaDeSalarioDia,
+} from './fainas-de-teste.js';
 
 const periodo: PeriodoOgmo = {
   indice: 0,
@@ -15,111 +20,100 @@ const periodo: PeriodoOgmo = {
   identificador: '01-07',
 };
 
+const diaNormal = { ...periodo, data: data(2026, 9, 8), identificador: '07-13' };
+
 describe('catálogo documental do PORTMAC', () => {
-  it('mantém no catálogo ACT ativo somente as fainas da planilha provisória', () => {
-    const catalogo = new CatalogoPortmac(fainasActProvisorias);
-
-    expect(catalogo.listarFainas()).toEqual(fainasActProvisorias);
-    expect(catalogo.listarFainas().every((faina) => faina.referencia.includes('Analise_ACT_PORTMAC_Calculadora_Terno_Portuario.xlsx')))
-      .toBe(true);
-    expect(catalogo.listarFainas().some((faina) => faina.referencia.includes('Anexo I')))
-      .toBe(false);
+  it('está vazio enquanto a ACT correta não for transcrita', () => {
+    // O cadastro anterior (ACT e CCT) foi retirado por estar incorreto: é
+    // preferível não ter faina a cotar com número errado.
+    expect(fainasAct).toEqual([]);
+    expect(new CatalogoPortmac(fainasAct).listarFainas()).toEqual([]);
   });
 
-  it('prioriza a ACT quando a mesma faina também aparece na CCT', () => {
-    const act = fainasActProvisorias[0]!;
-    const cct: RegistroDeFaina = { ...act, fonte: 'CCT', vigencia: 'teste CCT' };
-    const catalogo = new CatalogoPortmac([act], [cct]);
+  it('só reconhece a ACT como fonte documental', () => {
+    const catalogo = new CatalogoPortmac([fainaDeProducao, fainaDeSalarioDia]);
 
-    expect(catalogo.obterFaina(act.codigo)?.fonte).toBe('ACT');
+    expect(catalogo.listarFainas().every((faina) => faina.fonte === 'ACT')).toBe(true);
+  });
+
+  it('mantém um único registro por código', () => {
+    const duplicada: RegistroDeFaina = { ...fainaDeProducao, vigencia: 'recadastro' };
+    const catalogo = new CatalogoPortmac([fainaDeProducao, duplicada]);
+
     expect(catalogo.listarFainas()).toHaveLength(1);
+    expect(catalogo.obterFaina(fainaDeProducao.codigo)?.vigencia).toBe('recadastro');
   });
 
-  it('calcula uma faina ACT provisória com a composição da planilha', () => {
-    const catalogo = new CatalogoPortmac(fainasActProvisorias);
-    const faina = fainasActProvisorias.find((registro) => registro.codigoDaTabela === '7.5.1')!;
+  it('calcula uma faina de produção com a composição do terno', () => {
+    const catalogo = new CatalogoPortmac([fainaDeProducao]);
 
     const custo = catalogo.calcularCustoDoPeriodo({
-      faina,
-      periodo: { ...periodo, data: data(2026, 9, 8), identificador: '07-13' },
+      faina: fainaDeProducao,
+      periodo: diaNormal,
       producaoToneladas: 100,
       ternos: 1,
     });
 
-    expect(custo.total).toBeCloseTo(100 * 34.46 * 15.4 * (1 + 1.152877), 6);
+    expect(custo.total).toBeCloseTo(100 * 3.01 * COTAS_DA_CARGA_GERAL * (1 + ENCARGOS_DE_TESTE), 6);
     expect(custo.memoria).toHaveLength(3);
-    expect(custo.memoria[2]?.descricao).toContain('ACT provisória');
+    expect(custo.memoria[2]?.descricao).toContain('Fonte: ACT');
   });
 
   it('não multiplica novamente a produção agregada pelos ternos', () => {
-    const catalogo = new CatalogoPortmac(fainasActProvisorias);
-    const faina = fainasActProvisorias.find((registro) => registro.codigoDaTabela === '7.5.1')!;
+    const catalogo = new CatalogoPortmac([fainaDeProducao]);
     const custo = catalogo.calcularCustoDoPeriodo({
-      faina,
-      periodo: { ...periodo, data: data(2026, 9, 8), identificador: '07-13' },
+      faina: fainaDeProducao,
+      periodo: diaNormal,
       producaoToneladas: 200,
       ternos: 2,
     });
 
-    expect(custo.total).toBeCloseTo(200 * 34.46 * 15.4 * (1 + 1.152877), 6);
+    expect(custo.total).toBeCloseTo(200 * 3.01 * COTAS_DA_CARGA_GERAL * (1 + ENCARGOS_DE_TESTE), 6);
   });
 
-  it('mantém a base fixa da faina ACT provisória em salário-dia', () => {
-    const catalogo = new CatalogoPortmac(fainasActProvisorias);
-    const faina = fainasActProvisorias.find((registro) => registro.codigoDaTabela === '14.1.0')!;
+  it('mantém a base fixa da faina em salário-dia', () => {
+    const catalogo = new CatalogoPortmac([fainaDeSalarioDia]);
 
     const custo = catalogo.calcularCustoDoPeriodo({
-      faina,
-      periodo: { ...periodo, data: data(2026, 9, 8), identificador: '07-13' },
+      faina: fainaDeSalarioDia,
+      periodo: diaNormal,
       producaoToneladas: 999,
       ternos: 1,
     });
 
-    expect(custo.total).toBeCloseTo(4 * 515.2 * (1 + 1.152877), 6);
+    expect(custo.total).toBeCloseTo(COTAS_DA_PEACAO * 515.2 * (1 + ENCARGOS_DE_TESTE), 6);
   });
 
   it('multiplica a composição de salário-dia pela quantidade de ternos', () => {
-    const catalogo = new CatalogoPortmac(fainasActProvisorias);
-    const faina = fainasActProvisorias.find((registro) => registro.codigoDaTabela === '14.1.0')!;
+    const catalogo = new CatalogoPortmac([fainaDeSalarioDia]);
     const custo = catalogo.calcularCustoDoPeriodo({
-      faina,
-      periodo: { ...periodo, data: data(2026, 9, 8), identificador: '07-13' },
+      faina: fainaDeSalarioDia,
+      periodo: diaNormal,
       producaoToneladas: 999,
       ternos: 2,
     });
 
-    expect(custo.total).toBeCloseTo(2 * 4 * 515.2 * (1 + 1.152877), 6);
+    expect(custo.total).toBeCloseTo(2 * COTAS_DA_PEACAO * 515.2 * (1 + ENCARGOS_DE_TESTE), 6);
   });
 
-  it('calcula a CCT de contêiner como tarifa unitária, sem multiplicar pelas cotas', () => {
-    const catalogo = new CatalogoPortmac([], fainasCctProvisorias);
-    const faina = fainasCctProvisorias.find((registro) => registro.codigoDaTabela === '6.0')!;
-    const custo = catalogo.calcularCustoDoPeriodo({ faina, periodo, producaoToneladas: 20, ternos: 1 });
+  it('recusa uma faina que não está no catálogo', () => {
+    const catalogo = new CatalogoPortmac([fainaDeProducao]);
 
-    expect(custo.total).toBeCloseTo(20 * 0.9625 * (1 + 1.152877) * 1.25, 6);
-    expect(custo.memoria[0]?.descricao).toContain('tarifa unitária');
-  });
-
-  it('cadastra somente as fainas CCT mapeadas na planilha provisória', () => {
-    expect(fainasCctIniciais).toEqual(fainasCctProvisorias);
-    expect(new Set(fainasCctIniciais.map((faina) => faina.codigo)).size)
-      .toBe(fainasCctIniciais.length);
-    expect(fainasCctIniciais.every((faina) => faina.fonte === 'CCT'))
-      .toBe(true);
-    expect(fainasCctIniciais.every((faina) => faina.status === 'PROVISORIA'))
-      .toBe(true);
-    expect(fainasCctIniciais.every((faina) => faina.referencia.includes('Analise_CCT_Calculadora_Terno_Portuario (1).xlsx')))
-      .toBe(true);
+    expect(() => catalogo.calcularCustoDoPeriodo({
+      faina: fainaDeSalarioDia,
+      periodo: diaNormal,
+      producaoToneladas: 10,
+      ternos: 1,
+    })).toThrow(/não está no catálogo/);
   });
 });
 
 describe('produção mínima garantida', () => {
-  const base = fainasActProvisorias.find((registro) => registro.codigoDaTabela === '3.1')!;
+  const base = fainaDeProducao;
   const comPiso: RegistroDeFaina = {
     ...base,
-    regraActProvisoria: { ...base.regraActProvisoria!, producaoMinimaPorTernoPorPeriodo: 400 },
+    regraAct: { ...base.regraAct!, producaoMinimaPorTernoPorPeriodo: 400 },
   };
-  const diaNormal = { ...periodo, data: data(2026, 9, 8), identificador: '07-13' };
 
   function custoDe(registro: RegistroDeFaina, producao: number, ternos: number): number {
     return new CatalogoPortmac([registro]).calcularCustoDoPeriodo({
@@ -131,8 +125,8 @@ describe('produção mínima garantida', () => {
   }
 
   it('nenhuma faina do catálogo declara piso, então o cálculo atual não muda', () => {
-    const declaram = [...fainasActProvisorias, ...fainasCctProvisorias].filter((registro) =>
-      (registro.regraActProvisoria ?? registro.regraCctProvisoria)?.producaoMinimaPorTernoPorPeriodo !== undefined);
+    const declaram = fainasAct
+      .filter((registro) => registro.regraAct?.producaoMinimaPorTernoPorPeriodo !== undefined);
     expect(declaram).toEqual([]);
   });
 

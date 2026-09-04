@@ -45,10 +45,9 @@ const tabelaBase: TabelaDeMajoracao = {
   feriadoNoite: 150,
 };
 
-/** As planilhas provisórias ACT e CCT indicam adicional noturno de 25% em dia útil. */
+/** A tabela da ACT indica adicional noturno de 25% em dia útil. */
 export const tabelasDeMajoracao: Readonly<Record<FonteDoCatalogo, TabelaDeMajoracao>> = {
   ACT: { ...tabelaBase, normalNoite: 25 },
-  CCT: { ...tabelaBase, normalNoite: 25 },
 };
 
 const PERIODOS_DIURNOS = new Set(['07-13', '13-19']);

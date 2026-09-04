@@ -846,23 +846,6 @@ td.period-premium-cell { min-width: 210px; white-space: normal; }
   font-size: var(--text-md);
 }
 .catalog-search input:focus { border-color: var(--navy-2); background: var(--card); box-shadow: var(--focus-ring); }
-.catalog-filters { display: flex; gap: var(--space-2); }
-.catalog-filter {
-  min-width: 72px;
-  height: var(--control-height);
-  padding: 0 var(--space-3);
-  color: var(--muted);
-  background: var(--surface-field);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-weight: 500;
-  text-transform: uppercase;
-  transition: color .2s, background .2s, border-color .2s, transform .2s;
-}
-.catalog-filter:hover, .catalog-filter.active { color: var(--navy); background: var(--yellow-soft); border-color: var(--yellow-line); }
-.catalog-filter:hover { transform: translateY(-1px); }
 .catalog-visible-count, .catalog-legend { color: var(--muted); font-family: var(--font-mono); font-size: var(--text-xs); white-space: nowrap; }
 .catalog-visible-count { margin-left: auto; }
 
@@ -890,7 +873,6 @@ td.period-premium-cell { min-width: 210px; white-space: normal; }
 .pending-pill { color: var(--warning-ink); background: var(--yellow-soft); }
 .ready-pill { color: var(--success-ink); background: var(--success-soft); }
 .source-act { color: var(--danger); background: #fde9e7; }
-.source-cct { color: var(--success-ink); background: var(--success-soft); }
 
 .catalog-details-button {
   display: inline-flex;

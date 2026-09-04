@@ -28,7 +28,6 @@ const pages = document.querySelectorAll<HTMLElement>('[data-page]');
 const routeLinks = document.querySelectorAll<HTMLAnchorElement>('[data-route]');
 const catalogSearchInput = document.querySelector<HTMLInputElement>('#catalog-search')!;
 const clientSearchInput = document.querySelector<HTMLInputElement>('#clients-search');
-const catalogFilterButtons = document.querySelectorAll<HTMLButtonElement>('[data-catalog-source]');
 const ternosEditorBody = document.querySelector<HTMLTableSectionElement>('#ternos-editor-body')!;
 const ternosEditorStatus = document.querySelector<HTMLDivElement>('#ternos-editor-status')!;
 const ternosEditorVolumeTotal = document.querySelector<HTMLElement>('#ternos-editor-volume-total')!;
@@ -42,7 +41,6 @@ let draftProductivities: readonly number[] = [];
 let periodosDoEditor: readonly PeriodoOgmo[] = [];
 let chaveDosPeriodosDoEditor = '';
 let fainaOptionIndex = -1;
-let catalogSourceFilter: 'TODAS' | 'ACT' | 'CCT' = 'TODAS';
 /** A referência depende só da faina; recalculá-la a cada tecla seria desperdício. */
 const referenciasPorFaina = new Map<string, ReferenciaDaFaina>();
 const SAVED_BUDGETS_KEY = 'sco-orcamentos-salvos';
@@ -91,11 +89,8 @@ function renderRoute(route: AppRoute): void {
 function renderCatalogPage(): void {
   const registros = catalogoPortmac.listarRegistros();
   const tableBody = document.querySelector<HTMLTableSectionElement>('#catalog-table-body')!;
-  const actCount = registros.filter((registro) => registro.fonte === 'ACT').length;
-  const cctCount = registros.filter((registro) => registro.fonte === 'CCT').length;
   const termo = normalizarBusca(catalogSearchInput.value);
   const filtrados = registros.filter((registro) => {
-    if (catalogSourceFilter !== 'TODAS' && registro.fonte !== catalogSourceFilter) return false;
     if (!termo) return true;
     return normalizarBusca([
       registro.descricao,
@@ -108,14 +103,10 @@ function renderCatalogPage(): void {
   });
 
   setText('#catalog-count', String(registros.length));
-  setText('#catalog-act-count', String(actCount));
-  setText('#catalog-cct-count', String(cctCount));
   setText('#catalog-visible-count', `${filtrados.length} ${filtrados.length === 1 ? 'faina encontrada' : 'fainas encontradas'}`);
   tableBody.innerHTML = filtrados.length ? filtrados.map((registro) => {
     const regra = registro.regra;
-    const regraCct = registro.regraCctProvisoria;
-    const regraAct = registro.regraActProvisoria;
-    const regraPlanilha = regraAct ?? regraCct;
+    const regraPlanilha = registro.regraAct;
     const status = registro.status === 'PENDENTE_DE_VALIDACAO' || (!regra && !regraPlanilha)
       ? '<span class="pending-pill">Pendente</span><small>aguarda validação</small>'
       : registro.status === 'PROVISORIA'
@@ -132,13 +123,15 @@ function renderCatalogPage(): void {
       <td><span class="catalog-group">${escapeHtml(registro.grupoDaTabela ?? 'Catálogo ACT')}</span><small>${escapeHtml(registro.vigencia)}</small></td>
       <td><span class="source-pill source-${registro.fonte.toLowerCase()}">${registro.fonte}</span>${status}</td>
       <td><span class="rule-value">${escapeHtml(rotuloDaUnidade(registro.unidade).plural)}</span><small>${escapeHtml(registro.unidade.toLowerCase())} · unidade da tabela</small></td>
-      <td>${regra ? `<span class="rule-value">${formatarMoeda(regra.taxaEstivaPorTonelada)}</span><small>estiva / ton / cota · ${formatarNumero(regra.cotasEstivaPorTerno)} cotas/terno · conferentes ${formatarMoeda(regra.taxaConferentesPorTonelada)} / ton</small>` : regraPlanilha ? `<span class="rule-value">${formatarMoeda(regraPlanilha.taxaBase)}</span><small>${regraPlanilha.baseDeCalculo === 'TARIFA_UNITARIA' ? 'tarifa unitária; não multiplicada por cotas' : 'cotas da equipe'} · ${regraPlanilha.regime === 'PRODUCAO' ? 'produção' : 'salário-dia'} · +${formatarNumero(regraPlanilha.encargosContribuicaoAdicional * 100)}% encargos</small>` : '<span class="pending-rule">Regra não habilitada</span><small>transcrição documental</small>'}</td>
+      <td>${regra ? `<span class="rule-value">${formatarMoeda(regra.taxaEstivaPorTonelada)}</span><small>estiva / ton / cota · ${formatarNumero(regra.cotasEstivaPorTerno)} cotas/terno · conferentes ${formatarMoeda(regra.taxaConferentesPorTonelada)} / ton</small>` : regraPlanilha ? `<span class="rule-value">${formatarMoeda(regraPlanilha.taxaBase)}</span><small>cotas da equipe · ${regraPlanilha.regime === 'PRODUCAO' ? 'produção' : 'salário-dia'} · +${formatarNumero(regraPlanilha.encargosContribuicaoAdicional * 100)}% encargos</small>` : '<span class="pending-rule">Regra não habilitada</span><small>transcrição documental</small>'}</td>
     </tr>
     <tr id="${detailsId}" class="catalog-details-row" hidden>
       <td colspan="5">${regraPlanilha ? renderCatalogMethod(registro, regraPlanilha) : '<div class="catalog-method-body"><p>Esta faina ainda não possui uma regra de custo habilitada.</p></div>'}</td>
     </tr>
   `;
-  }).join('') : '<tr><td colspan="5" class="catalog-empty-result">Nenhuma faina corresponde aos filtros atuais.</td></tr>';
+  }).join('') : `<tr><td colspan="5" class="catalog-empty-result">${registros.length
+    ? 'Nenhuma faina corresponde à busca atual.'
+    : 'Nenhuma faina cadastrada: o catálogo aguarda a transcrição da ACT correta.'}</td></tr>`;
 }
 
 function renderClientsPage(): void {
@@ -280,16 +273,11 @@ function renderSavedBudgetDetails(resultado: ResultadoDeSimulacao, faina?: Retur
 
 function renderCatalogMethod(
   registro: ReturnType<typeof catalogoPortmac.listarRegistros>[number],
-  regra: NonNullable<ReturnType<typeof catalogoPortmac.listarRegistros>[number]['regraActProvisoria'] | ReturnType<typeof catalogoPortmac.listarRegistros>[number]['regraCctProvisoria']>,
+  regra: NonNullable<ReturnType<typeof catalogoPortmac.listarRegistros>[number]['regraAct']>,
 ): string {
-  const fator = regra.baseDeCalculo === 'TARIFA_UNITARIA' ? '1 tarifa unitária' : 'cotas da equipe';
   const formula = regra.regime === 'PRODUCAO'
-    ? regra.baseDeCalculo === 'TARIFA_UNITARIA'
-      ? 'tarifa-base × produção agregada dos ternos × encargos × majoração'
-      : 'cotas × tarifa-base × produção agregada dos ternos × encargos × majoração'
-    : regra.baseDeCalculo === 'TARIFA_UNITARIA'
-      ? 'tarifa-base × encargos × majoração × ternos'
-      : 'cotas × tarifa-base × encargos × majoração × ternos';
+    ? 'cotas × tarifa-base × produção agregada dos ternos × encargos × majoração'
+    : 'cotas × tarifa-base × encargos × majoração × ternos';
   const composition = regra.composicao.map((item) =>
     `<li>${escapeHtml(item.categoria)}: ${item.homens} homens · ${formatarNumero(item.cotas)} cotas${item.funcoes.length ? ` · ${escapeHtml(item.funcoes.join(', '))}` : ''}</li>`,
   ).join('');
@@ -302,7 +290,7 @@ function renderCatalogMethod(
       <div><span>Base monetária</span><strong>${formatarMoeda(regra.taxaBase)}</strong></div>
       <div><span>Unidade</span><strong>${escapeHtml(rotuloDaUnidade(regra.unidade).plural)}</strong></div>
       <div><span>Regime</span><strong>${regra.regime === 'PRODUCAO' ? 'produção' : 'salário-dia'}</strong></div>
-      <div><span>Tratamento da equipe</span><strong>${fator}</strong></div>
+      <div><span>Tratamento da equipe</span><strong>cotas da equipe</strong></div>
       <div><span>Encargos</span><strong>+${formatarNumero(regra.encargosContribuicaoAdicional * 100)}%</strong></div>
       <div><span>Fonte</span><strong>${escapeHtml(registro.fonte)} · ${escapeHtml(registro.codigoDaTabela ?? registro.codigo)}</strong></div>
     </div>
@@ -326,15 +314,6 @@ ternosPorPeriodoInput.addEventListener('input', aoMudarOCenario);
 dateInput.addEventListener('change', aoMudarOCenario);
 periodInput.addEventListener('change', aoMudarOCenario);
 catalogSearchInput.addEventListener('input', renderCatalogPage);
-catalogFilterButtons.forEach((button) => button.addEventListener('click', () => {
-  catalogSourceFilter = button.dataset.catalogSource as 'TODAS' | 'ACT' | 'CCT';
-  catalogFilterButtons.forEach((filter) => {
-    const active = filter === button;
-    filter.classList.toggle('active', active);
-    filter.setAttribute('aria-pressed', String(active));
-  });
-  renderCatalogPage();
-}));
 fainaInput.addEventListener('input', handleFainaInput);
 fainaInput.addEventListener('focus', () => openFainaOptions());
 fainaInput.addEventListener('keydown', handleFainaKeydown);
@@ -1384,7 +1363,9 @@ function renderFainaOptions(): void {
       <strong>${escapeHtml(faina.descricao)}</strong>
       <small>${escapeHtml(faina.codigoDaTabela ?? faina.codigo)} · ${faina.fonte}${faina.status === 'PROVISORIA' ? ' · provisória' : ''}</small>
     </button>
-  `).join('') : '<div class="combobox-empty">Nenhuma faina encontrada.</div>';
+  `).join('') : `<div class="combobox-empty">${fainasSelecionaveis.length
+    ? 'Nenhuma faina encontrada.'
+    : 'Nenhuma faina cadastrada: o catálogo aguarda a transcrição da ACT correta.'}</div>`;
   fainaOptionIndex = -1;
 }
 

@@ -1,5 +1,15 @@
 # Auditoria do motor de cálculo do SCO
 
+> **Nota posterior (setembro de 2026).** O catálogo auditado aqui não existe
+> mais: a CCT foi removida do sistema por decisão de negócio e o mapeamento
+> provisório da ACT foi retirado por estar incorreto. Os achados B1, B2 e B3
+> descrevem dados que já não estão no repositório — mas as perguntas que eles
+> levantam (a tarifa do documento é por cota ou por equipe? o que multiplica o
+> quê?) continuam abertas e precisam ser respondidas **antes** do recadastro da
+> ACT correta em `src/catalogo/act.ts`. O que trata do motor, e não da tabela,
+> segue valendo. `baseDeCalculo`/`TARIFA_UNITARIA` e os arquivos
+> `cct-provisorio.ts` e `act-provisorio.ts` citados abaixo já não existem.
+
 **Base auditada:** commit `c7ee926`
 **Método:** execução do motor real (`simular()` sobre `catalogoPortmac` e `calendarioOperacional`), sem mocks. Nenhum valor deste documento foi estimado.
 **Data de início dos cenários:** 14/09/2026 (segunda-feira sem feriado), salvo onde indicado.

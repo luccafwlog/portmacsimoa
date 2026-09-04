@@ -5,7 +5,7 @@ export type UnidadeDeMedida = 'TON' | 'VOLUME' | 'UNIDADE' | 'CONTAINER' | 'EQUI
 
 export type StatusDaFaina = 'VALIDADA' | 'PROVISORIA' | 'PENDENTE_DE_VALIDACAO';
 
-export type FonteDoCatalogo = 'ACT' | 'CCT';
+export type FonteDoCatalogo = 'ACT';
 
 export type TipoDeCustoOpcional =
   | 'MATERIAL_DE_PEACAO'
@@ -22,42 +22,36 @@ export interface CustoOpcional {
 }
 
 export type RegimeRemuneratorio = 'PRODUCAO' | 'SALARIO_DIA';
-export type BaseDeCalculoProvisoria = 'COTAS_DA_EQUIPE' | 'TARIFA_UNITARIA';
 
-export interface ComposicaoCctProvisoria {
+export interface ComposicaoDoTerno {
   readonly categoria: string;
   readonly funcoes: readonly string[];
   readonly homens: number;
   readonly cotas: number;
 }
 
-export interface RegraDeComposicaoProvisoria {
+export interface RegraDeComposicaoDaFaina {
   readonly taxaBase: number;
-  readonly baseDeCalculo: BaseDeCalculoProvisoria;
   readonly regime: RegimeRemuneratorio;
   readonly unidade: UnidadeDeMedida;
-  /** Valor usado pela planilha como adicional de encargos/contribuições. */
+  /** Adicional de encargos/contribuições declarado pelo documento da ACT. */
   readonly encargosContribuicaoAdicional: number;
   /**
    * Produção mínima faturável por terno em um período, quando a tabela
-   * ACT/CCT garante um piso à equipe.
+   * da ACT garante um piso à equipe.
    *
    * Com um piso, a quantidade cobrada é `max(produção, mínimo × ternos)`: abaixo
    * do piso paga-se o piso, acima dele paga-se a produção. É o que cria o joelho
    * da curva de custo por produtividade — abaixo do ponto de virada o custo
    * unitário cai como 1/produtividade, acima dele fica plano.
    *
-   * PENDENTE DE LEVANTAMENTO: nenhuma faina do catálogo declara este valor
-   * ainda. Enquanto estiver ausente, o cálculo não aplica piso algum e a curva
-   * de referência não tem joelho. Só a ACT 1.1 menciona o assunto, e para dizer
-   * que é uma operação *sem* produção mínima.
+   * PENDENTE DE LEVANTAMENTO: o catálogo está vazio à espera da ACT correta.
+   * Enquanto o piso estiver ausente, o cálculo não aplica piso algum e a curva
+   * de referência não tem joelho.
    */
   readonly producaoMinimaPorTernoPorPeriodo?: number;
-  readonly composicao: readonly ComposicaoCctProvisoria[];
+  readonly composicao: readonly ComposicaoDoTerno[];
 }
-
-export type RegraCctProvisoria = RegraDeComposicaoProvisoria;
-export type RegraActProvisoria = RegraDeComposicaoProvisoria;
 
 export interface InicioDaOperacao {
   readonly data: DataLocal;
@@ -85,9 +79,9 @@ export interface EntradaDeSimulacao {
 
 export interface FainaCatalogada {
   readonly codigo: string;
-  /** Código único no catálogo; na CCT inclui o grupo da tabela. */
+  /** Código único no catálogo; inclui o grupo da tabela quando houver. */
   readonly codigoDaTabela?: string;
-  /** Grupo/tabela de origem quando a fonte é a CCT. */
+  /** Grupo/tabela de origem no documento da ACT. */
   readonly grupoDaTabela?: string;
   readonly descricao: string;
   readonly tipoDeCarga: string;

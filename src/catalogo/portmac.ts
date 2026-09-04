@@ -2,12 +2,12 @@ import type {
   ContextoDeCustoDoPeriodo,
   CustoDoPeriodo,
   FainaCatalogada,
-  RegraDeComposicaoProvisoria,
+  RegraDeComposicaoDaFaina,
 } from '../dominio/tipos.js';
 import type { CatalogoOgmo } from './portas.js';
 import { descricaoDoAdicional, obterMajoracaoDoPeriodo } from '../dominio/majoracoes.js';
 import { formatarNumero, formatarPercentual } from '../dominio/formato.js';
-import { fainasActProvisorias } from './act-provisorio.js';
+import { fainasAct } from './act.js';
 
 export interface RegraDeCustoPorTonelada {
   /** Taxa total da estiva por tonelada e por cota, sem homens extras. */
@@ -20,33 +20,25 @@ export interface RegraDeCustoPorTonelada {
 
 export interface RegistroDeFaina extends FainaCatalogada {
   readonly regra?: RegraDeCustoPorTonelada;
-  readonly regraCctProvisoria?: RegraDeComposicaoProvisoria;
-  readonly regraActProvisoria?: RegraDeComposicaoProvisoria;
+  readonly regraAct?: RegraDeComposicaoDaFaina;
 }
 
-/** A CCT ativa no simulador é o mapeamento provisório exclusivo da planilha. */
-export { fainasCctIniciais } from './cct.js';
-import { fainasCctIniciais } from './cct.js';
+export { fainasAct } from './act.js';
 
 export class CatalogoPortmac implements CatalogoOgmo {
-  constructor(
-    private readonly fainasAct: readonly RegistroDeFaina[],
-    private readonly fainasCct: readonly RegistroDeFaina[] = [],
-  ) {}
+  /** Um código, um registro: listagem e consulta leem sempre o mesmo mapa. */
+  private readonly fainas: ReadonlyMap<string, RegistroDeFaina>;
+
+  constructor(fainas: readonly RegistroDeFaina[]) {
+    this.fainas = new Map(fainas.map((faina) => [faina.codigo, faina]));
+  }
 
   listarFainas(): readonly FainaCatalogada[] {
     return this.listarRegistros();
   }
 
   listarRegistros(): readonly RegistroDeFaina[] {
-    const fainas = new Map<string, RegistroDeFaina>();
-    for (const faina of [...this.fainasAct, ...this.fainasCct]) {
-      // ACT sempre vence quando os dois instrumentos possuem o mesmo código.
-      if (!fainas.has(faina.codigo) || faina.fonte === 'ACT') {
-        fainas.set(faina.codigo, faina);
-      }
-    }
-    return [...fainas.values()];
+    return [...this.fainas.values()];
   }
 
   obterFaina(codigo: string): FainaCatalogada | undefined {
@@ -58,9 +50,8 @@ export class CatalogoPortmac implements CatalogoOgmo {
     if (!faina) {
       throw new Error(`Faina ${contexto.faina.codigo} não está no catálogo.`);
     }
-    const regraProvisoria = faina.regraActProvisoria ?? faina.regraCctProvisoria;
-    if (regraProvisoria) {
-      return calcularCustoComposicaoProvisoria(contexto, faina, regraProvisoria);
+    if (faina.regraAct) {
+      return calcularCustoPorComposicao(contexto, faina, faina.regraAct);
     }
     if (faina.status === 'PENDENTE_DE_VALIDACAO' || !faina.regra) {
       throw new Error(`A faina ${faina.descricao} ainda está pendente de validação.`);
@@ -102,15 +93,14 @@ export class CatalogoPortmac implements CatalogoOgmo {
   }
 
   private obterRegistro(codigo: string): RegistroDeFaina | undefined {
-    return this.fainasAct.find((faina) => faina.codigo === codigo)
-      ?? this.fainasCct.find((faina) => faina.codigo === codigo);
+    return this.fainas.get(codigo);
   }
 }
 
-function calcularCustoComposicaoProvisoria(
+function calcularCustoPorComposicao(
   contexto: ContextoDeCustoDoPeriodo,
   faina: RegistroDeFaina,
-  regra: RegraDeComposicaoProvisoria,
+  regra: RegraDeComposicaoDaFaina,
 ): CustoDoPeriodo {
   const majoracao = contexto.majoracao ?? obterMajoracaoDoPeriodo({
     data: contexto.periodo.data,
@@ -127,19 +117,15 @@ function calcularCustoComposicaoProvisoria(
     : 1;
   const pisoAplicado = regra.regime === 'PRODUCAO' && pisoDoPeriodo > contexto.producaoToneladas;
   const fatorEncargos = 1 + regra.encargosContribuicaoAdicional;
-  const itens = regra.baseDeCalculo === 'TARIFA_UNITARIA'
-    ? [{ categoria: 'Tarifa CCT', homens: 0, cotas: 0, funcoes: [] as readonly string[] }]
-    : regra.composicao;
-  const memoria = itens.map((item) => {
-    const fatorDaEquipe = regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 1 : item.cotas;
-    const custoBase = fatorDaEquipe * regra.taxaBase * quantidadeBase;
+  const memoria = regra.composicao.map((item) => {
+    const custoBase = item.cotas * regra.taxaBase * quantidadeBase;
     const multiplicaPorTernos = regra.regime === 'SALARIO_DIA' ? contexto.ternos : 1;
     const custoTotal = custoBase * fatorEncargos * majoracao.fator * multiplicaPorTernos;
     const unidade = regra.regime === 'PRODUCAO'
       ? pisoAplicado ? 'produção mínima garantida' : 'produção do período'
       : 'salário-dia';
     return {
-      descricao: `${item.categoria} · ${item.homens} homens · ${regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 'tarifa unitária' : `${formatarNumero(item.cotas)} cotas agregadas`} × ${formatarNumero(regra.taxaBase, 4)} · ${unidade} · ${descricaoDoAdicional(majoracao.adicionalPercentual)}${regra.regime === 'SALARIO_DIA' ? ` · ${contexto.ternos} terno(s)` : ' · produção agregada dos ternos'}`,
+      descricao: `${item.categoria} · ${item.homens} homens · ${formatarNumero(item.cotas)} cotas agregadas × ${formatarNumero(regra.taxaBase, 4)} · ${unidade} · ${descricaoDoAdicional(majoracao.adicionalPercentual)}${regra.regime === 'SALARIO_DIA' ? ` · ${contexto.ternos} terno(s)` : ' · produção agregada dos ternos'}`,
       valor: custoTotal,
     };
   });
@@ -151,14 +137,11 @@ function calcularCustoComposicaoProvisoria(
     memoria: [
       ...memoria,
       {
-        descricao: `Fonte: ${faina.fonte} provisória · ${faina.codigoDaTabela ?? faina.codigo} · ${regra.baseDeCalculo === 'TARIFA_UNITARIA' ? 'tarifa unitária; composição não multiplicada por cotas' : 'cotas da equipe'} · encargos/contribuições +${formatarPercentual(regra.encargosContribuicaoAdicional * 100)} · ${majoracao.descricao}`,
+        descricao: `Fonte: ${faina.fonte} · ${faina.codigoDaTabela ?? faina.codigo} · cotas da equipe · encargos/contribuições +${formatarPercentual(regra.encargosContribuicaoAdicional * 100)} · ${majoracao.descricao}`,
         valor: total,
       },
     ],
   };
 }
 
-export const catalogoPortmac = new CatalogoPortmac(
-  fainasActProvisorias,
-  fainasCctIniciais,
-);
+export const catalogoPortmac = new CatalogoPortmac(fainasAct);
