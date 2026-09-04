@@ -1,0 +1,50 @@
+name: Validate application
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Test and build
+    runs-on: ubuntu-latest
+    # Tudo neste job, menos o `npm ci`, roda em 12 segundos. As 11 execuções
+    # anteriores levaram de 18 a 26 segundos ponta a ponta; na primeira execução
+    # do PR #28 o `npm ci` sozinho levou 7 minutos e o job ainda assim passou.
+    #
+    # O limite não existe para reprovar uma instalação lenta — essa execução foi
+    # correta, só demorada, e teria passado dentro destes 10 minutos. Ele existe
+    # para que um `npm ci` que de fato trave pare em 10 minutos em vez de ocupar
+    # o runner até o teto padrão de seis horas.
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      # `npm run build` é `tsc --noEmit && vite build`: o typecheck já está
+      # dentro dele. Um passo separado compilaria o projeto inteiro duas vezes.
+      - name: Typecheck and build
+        run: npm run build

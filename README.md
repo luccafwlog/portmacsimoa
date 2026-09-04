@@ -62,7 +62,7 @@ O projeto `portmacsimoa` está vinculado ao repositório GitHub
 
 - cada PR aberta ou atualizada gera um Preview Deployment;
 - cada merge ou push em `main` gera o deploy de produção;
-- o workflow `.github/workflows/vercel-deploy.yml` fica responsável apenas por
+- o workflow `.github/workflows/validate.yml` fica responsável apenas por
   testes, typecheck e build.
 
 Não são necessários `VERCEL_TOKEN`, `VERCEL_ORG_ID` ou `VERCEL_PROJECT_ID` como
