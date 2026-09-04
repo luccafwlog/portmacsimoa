@@ -24,7 +24,7 @@ describe('formatação', () => {
     expect(formatarNumero(Number.POSITIVE_INFINITY)).toBe('—');
   });
 
-  it('mantém as três casas do adicional das tabelas ACT/CCT', () => {
+  it('mantém as três casas do adicional da tabela da ACT', () => {
     expect(formatarPercentual(134.375)).toBe('134,375%');
     expect(formatarPercentual(87.5)).toBe('87,5%');
   });

@@ -61,7 +61,7 @@ export function formatarNumeroFixo(valor: number, casasDecimais: number): string
   });
 }
 
-/** `87,5%` — o adicional das tabelas ACT/CCT chega a três casas. */
+/** `87,5%` — o adicional da tabela da ACT chega a três casas. */
 export function formatarPercentual(valor: number, casasDecimais = 3): string {
   return `${formatarNumero(valor, casasDecimais)}%`;
 }

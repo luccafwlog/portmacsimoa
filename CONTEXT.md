@@ -14,12 +14,11 @@ o custo final nem uma previsão automática da operação.
   cálculo do cenário.
 - **Faina** — a operação que será cotada. Uma simulação trata uma única faina.
   A faina é selecionada do catálogo; o usuário não cria uma faina livremente.
-  A ACT é sempre consultada primeiro. A CCT só é usada quando a faina não
-  estiver prevista na ACT.
+  A ACT é a única fonte documental do catálogo: a CCT foi removida do sistema.
 - **Período** — uma das quatro faixas diárias da operação: `01-07`, `07-13`,
   `13-19` ou `19-01`. Cada período é apresentado junto da sua data de início;
   o período `19-01` termina no dia seguinte. A remuneração do período segue a
-  tabela da ACT/CCT: dia normal preço normal; sábado 07-19 preço normal e
+  tabela da ACT: dia normal preço normal; sábado 07-19 preço normal e
   19-07 +87,5%; domingo 07-19 +87,5% e 19-07 +134,375%; feriado 07-19
   +100% e 19-07 +150%. O adicional é somado ao preço normal.
   Quando o feriado cai no domingo, somente a tabela de feriado é aplicada.
@@ -32,11 +31,18 @@ o custo final nem uma previsão automática da operação.
   manual posterior, preservando o total calculado.
 - **Catálogo do OGMO** — fonte externa dos valores e regras necessários para
   calcular o custo de um período. Cada faina cadastrada mantém sua fonte,
-  vigência e referência documental. O cadastro CCT provisório usa uma única
-  linha por faina da planilha autorizada; levantamentos alternativos ficam fora
-  do catálogo até serem validados. Uma faina transcrita, mas ainda não
-  validada, fica visível no catálogo e fora da simulação. Não existe preço
-  criado pelo usuário.
+  vigência e referência documental. Levantamentos alternativos ficam fora do
+  catálogo até serem validados. Uma faina transcrita, mas ainda não validada,
+  fica visível no catálogo e fora da simulação. Não existe preço criado pelo
+  usuário. **O catálogo está vazio**: o cadastro anterior — CCT inteira e o
+  mapeamento provisório da ACT — foi retirado, o primeiro por decisão de
+  negócio e o segundo por estar incorreto.
+
+- **ACT 2026/2028** — o acordo coletivo assinado em 02/06/2026 é a única fonte
+  de taxas, salários, composição de equipe e adicionais. A segunda e última
+  referência é o calendário: fins de semana, feriados nacionais e os feriados
+  municipais de **Vila Velha**. `docs/act-2026-2028.md` resume as regras
+  confirmadas e a extração completa está em `docs/fontes/`.
 
 ## Fluxo decidido
 
@@ -62,8 +68,7 @@ o custo final nem uma previsão automática da operação.
    cada custo com a remuneração da faixa e do dia. Sábados e domingos são
    identificados pela data; feriados nacionais fixos também são reconhecidos
    automaticamente pelo calendário nacional da aplicação.
-   A resolução da faina segue ACT e, somente quando necessário, CCT. As regras
-   das planilhas ACT/CCT são provisórias e calculam um terno completo.
+   A faina vem sempre da ACT; a regra calcula um terno completo.
 7. O resultado mostra custo total, custo por unidade e memória simples por
    período. O custo final soma a mão de obra aos custos opcionais informados.
 8. O detalhamento por períodos é onde o cenário é desenhado: cada período
@@ -102,8 +107,8 @@ o custo final nem uma previsão automática da operação.
 - **Nova simulação** é a página principal e concentra a montagem do cenário.
 - **Clientes cadastrados** será o ponto de consulta do histórico de simulações
   e orçamentos associados a cada cliente.
-- **Catálogo de fainas** detalha as fainas cadastradas, sua fonte (ACT ou CCT),
-  vigência e regra de cálculo.
+- **Catálogo de fainas** detalha as fainas cadastradas, sua vigência e sua
+  regra de cálculo. A fonte é sempre a ACT.
 - A navegação atual é uma composição simples de páginas no cliente.
 - Os orçamentos salvos ficam no `localStorage` do navegador, agrupados por
   cliente na página de clientes. Não existe banco, sincronização entre
@@ -144,27 +149,20 @@ o custo final nem uma previsão automática da operação.
 - sem cobertura de feriados municipais, estaduais ou portuários;
 - sem banco, autenticação ou histórico.
 
-## Produção mínima garantida — pendente
+## Piso de remuneração — resolvido pela ACT
 
-A regra de custo aceita `producaoMinimaPorTernoPorPeriodo`: com um piso, a
-quantidade cobrada é `max(produção, piso × ternos)`. **Nenhuma faina do catálogo
-declara esse valor**, e enquanto isso não mudar o cálculo não aplica piso algum.
+Não existe produção mínima em toneladas. A cláusula 5ª, § 2º da ACT estabelece
+um piso em **reais**: quando a remuneração por produção não alcança o
+salário-dia, ele é o mínimo do período requisitado. Como as cotas multiplicam os
+dois lados, o custo de um terno é `cotas × max(taxa × produção, salário-dia)` e a
+produção que iguala os dois é `salário-dia ÷ taxa`.
 
-É esse piso que cria o joelho da curva de custo por produtividade — abaixo dele
-o custo unitário cai como 1/produtividade, acima dele fica plano. A curva de
-referência levantada pela PORTMAC na planilha legada de fertilizantes cai de
-R$ 34,05 a cerca de R$ 26,50 entre 500 e 700 t por terno e depois estabiliza;
-essa razão de 1,28 na ponta baixa implica um piso perto de 650 t por terno por
-período. Sem os valores documentais por faina, o simulador não tem como apontar
-um ótimo próprio da faina, e diz isso na análise em vez de inventar um número.
+É esse ponto que dobra a curva de custo por produtividade. Para granéis ele cai
+em `306,97 ÷ 0,48 = 640 t` por terno por período — o mesmo joelho perto de 650 t
+que a curva legada de fertilizantes mostrava e que o projeto tratava como uma
+produção mínima documentalmente ausente. O número sai do Anexo I, não de
+suposição.
 
-A única faina que menciona o assunto é a ACT 1.1, e para dizer que é uma
-operação *sem* produção mínima.
-
-O catálogo da aplicação usa provisoriamente o mapeamento da planilha ACT
-2026/2028 para 8 fainas; o mapeamento da planilha CCT
-2024/2026 está habilitado provisoriamente para 41 fainas. Ambos usam composição
-por terno, regime de produção ou salário-dia e encargos/contribuições conforme
-as próprias planilhas. Os levantamentos documentais restantes continuam
-pendentes até a substituição pelos documentos oficiais. Os catálogos falsos dos
-testes servem apenas para validar o motor.
+O catálogo cadastra as doze fainas da ACT em `src/catalogo/act.ts`, cada uma com
+regra de estiva e de conferentes. `docs/act-2026-2028.md` descreve o modelo e as
+pendências; a extração do documento está em `docs/fontes/`.

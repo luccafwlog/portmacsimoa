@@ -6,7 +6,7 @@ O usuário informa uma faina, o início da operação, o volume, a produtividade
 total por período e o total de ternos da operação. O núcleo calcula a quantidade
 de períodos, distribui os ternos inteiros entre eles e devolve o custo total, o
 custo unitário e uma memória detalhada do cálculo. As majorações de jornada
-da ACT/CCT são aplicadas por período; sábados e domingos e feriados nacionais
+da ACT são aplicadas por período; sábados e domingos e feriados nacionais
 fixos são reconhecidos pela data pelo calendário nacional da aplicação.
 Custos opcionais de operação podem ser informados separadamente; cada item é
 dividido pelo volume do navio e somado ao custo final. Também é possível
@@ -34,18 +34,22 @@ faina tem ótimo em produtividades muito diferentes conforme a data de início �
 o feriado e o fim de semana pesam mais que a produtividade.
 
 O cálculo aceita uma produção mínima garantida por faina, que é o que faz o
-custo unitário parar de cair a partir de certa produtividade. Nenhuma faina do
-catálogo declara esse valor ainda; enquanto isso, a análise informa a forma da
+custo unitário parar de cair a partir de certa produtividade. Nenhuma faina declara esse
+valor (o catálogo está vazio); enquanto isso, a análise informa a forma da
 curva em vez de apontar um ótimo que o modelo não sustenta.
 
 Os orçamentos salvos ficam apenas no `localStorage` do navegador.
 
 As regras e os valores do OGMO entram por duas portas: `CatalogoOgmo` fornece a
 faina e calcula o custo de cada período; `CalendarioOgmo` projeta os períodos a
-partir de uma data e de um identificador de período. Os detalhes oficiais ainda
-estão pendentes; os mapeamentos das planilhas ACT 2026/2028 e CCT 2024/2026
-estão habilitados apenas como regras provisórias, claramente identificadas no
-catálogo e no resultado.
+partir de uma data e de um identificador de período. A única fonte documental do
+catálogo é a ACT: o cadastro da CCT foi removido do sistema.
+
+**O catálogo está vazio.** O mapeamento provisório da ACT que estava cadastrado
+foi retirado por estar incorreto, e a transcrição do documento correto está
+pendente. Enquanto ela não chegar não há faina selecionável e nenhuma simulação
+pode ser calculada — o que é deliberado: cotar com tabela errada é pior do que
+não cotar. O recadastro entra em `src/catalogo/act.ts`.
 
 ## Desenvolvimento
 

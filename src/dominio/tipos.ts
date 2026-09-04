@@ -5,7 +5,7 @@ export type UnidadeDeMedida = 'TON' | 'VOLUME' | 'UNIDADE' | 'CONTAINER' | 'EQUI
 
 export type StatusDaFaina = 'VALIDADA' | 'PROVISORIA' | 'PENDENTE_DE_VALIDACAO';
 
-export type FonteDoCatalogo = 'ACT' | 'CCT';
+export type FonteDoCatalogo = 'ACT';
 
 export type TipoDeCustoOpcional =
   | 'MATERIAL_DE_PEACAO'
@@ -21,43 +21,70 @@ export interface CustoOpcional {
   readonly custoTotal: number;
 }
 
-export type RegimeRemuneratorio = 'PRODUCAO' | 'SALARIO_DIA';
-export type BaseDeCalculoProvisoria = 'COTAS_DA_EQUIPE' | 'TARIFA_UNITARIA';
+/**
+ * Como a taxa do Anexo I remunera a equipe.
+ *
+ * `POR_COTA` — a taxa é de um homem e multiplica a soma das cotas da equipe.
+ * `POR_EQUIPE` — a taxa já é o valor arrecadado pela equipe inteira.
+ *
+ * A observação literal do Anexo I é "Conferente = Taxa equipe / Demais = Taxa
+ * homem", e o Anexo III, VII confirma para a estiva: "o salário-dia e o
+ * salário-produção são por homem da equipe, referente a 1 (uma) cota".
+ */
+export type BaseDaTaxa = 'POR_COTA' | 'POR_EQUIPE';
 
-export interface ComposicaoCctProvisoria {
+/**
+ * Se a função é requisitada uma vez por terno ou uma vez para o navio.
+ *
+ * O Anexo Conferentes é explícito: "01 conferente chefe, por navio" contra
+ * "01 conferente lingada, para cada terno em operação". Cobrar o chefe em cada
+ * terno superfatura toda operação com mais de um terno.
+ */
+export type EscopoDaFuncao = 'POR_TERNO' | 'POR_NAVIO';
+
+export interface ComposicaoDoTerno {
   readonly categoria: string;
   readonly funcoes: readonly string[];
   readonly homens: number;
   readonly cotas: number;
+  /** Ausente equivale a `POR_TERNO`: é o caso de toda a estiva. */
+  readonly escopo?: EscopoDaFuncao;
 }
 
-export interface RegraDeComposicaoProvisoria {
-  readonly taxaBase: number;
-  readonly baseDeCalculo: BaseDeCalculoProvisoria;
-  readonly regime: RegimeRemuneratorio;
-  readonly unidade: UnidadeDeMedida;
-  /** Valor usado pela planilha como adicional de encargos/contribuições. */
-  readonly encargosContribuicaoAdicional: number;
+/**
+ * A regra de uma das duas categorias que compõem o custo de um período.
+ *
+ * O custo de um período é sempre estiva + conferentes: o Anexo I traz as duas
+ * em tabelas separadas, com bases de taxa diferentes.
+ */
+export interface RegraDeCategoria {
   /**
-   * Produção mínima faturável por terno em um período, quando a tabela
-   * ACT/CCT garante um piso à equipe.
+   * Coluna "Total c/E.S" da taxa no Anexo I, por unidade movimentada.
    *
-   * Com um piso, a quantidade cobrada é `max(produção, mínimo × ternos)`: abaixo
-   * do piso paga-se o piso, acima dele paga-se a produção. É o que cria o joelho
-   * da curva de custo por produtividade — abaixo do ponto de virada o custo
-   * unitário cai como 1/produtividade, acima dele fica plano.
-   *
-   * PENDENTE DE LEVANTAMENTO: nenhuma faina do catálogo declara este valor
-   * ainda. Enquanto estiver ausente, o cálculo não aplica piso algum e a curva
-   * de referência não tem joelho. Só a ACT 1.1 menciona o assunto, e para dizer
-   * que é uma operação *sem* produção mínima.
+   * Ausente quando a faina não tem produção — a peação é remuneração fixa e
+   * paga só o salário-dia.
    */
-  readonly producaoMinimaPorTernoPorPeriodo?: number;
-  readonly composicao: readonly ComposicaoCctProvisoria[];
+  readonly taxa?: number;
+  readonly baseDaTaxa: BaseDaTaxa;
+  /**
+   * Coluna "Salário Dia · Total c/E.S" do Anexo I: o piso de um período.
+   *
+   * Cláusula 5ª, § 2º: quando a remuneração por produção não alcança o
+   * salário-dia, ele é o mínimo do período requisitado. O piso é em REAIS por
+   * cota — não existe piso de tonelagem nesta ACT. Como as cotas multiplicam os
+   * dois lados, o custo de um terno é `cotas × max(taxa × produção, salário-dia)`
+   * e a produção que iguala os dois é `salário-dia ÷ taxa`.
+   */
+  readonly salarioDiaPorCota: number;
+  readonly composicao: readonly ComposicaoDoTerno[];
 }
 
-export type RegraCctProvisoria = RegraDeComposicaoProvisoria;
-export type RegraActProvisoria = RegraDeComposicaoProvisoria;
+export interface RegraDaFaina {
+  readonly unidade: UnidadeDeMedida;
+  readonly estiva: RegraDeCategoria;
+  /** Ausente quando a faina não requisita conferentes, como a peação. */
+  readonly conferentes?: RegraDeCategoria;
+}
 
 export interface InicioDaOperacao {
   readonly data: DataLocal;
@@ -85,9 +112,9 @@ export interface EntradaDeSimulacao {
 
 export interface FainaCatalogada {
   readonly codigo: string;
-  /** Código único no catálogo; na CCT inclui o grupo da tabela. */
+  /** Código único no catálogo; inclui o grupo da tabela quando houver. */
   readonly codigoDaTabela?: string;
-  /** Grupo/tabela de origem quando a fonte é a CCT. */
+  /** Grupo/tabela de origem no documento da ACT. */
   readonly grupoDaTabela?: string;
   readonly descricao: string;
   readonly tipoDeCarga: string;

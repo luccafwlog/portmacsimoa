@@ -7,14 +7,30 @@ import {
 } from '../src/calendario/referencia.js';
 import { calendarioOperacional } from '../src/calendario/operacional.js';
 import { CatalogoPortmac, type RegistroDeFaina } from '../src/catalogo/portmac.js';
-import { fainasActProvisorias } from '../src/catalogo/act-provisorio.js';
 import { analisarFainaDeReferencia, volumeDeReferencia } from '../src/motor/referencia.js';
+import { fainaDeProducao, fainaDeSalarioDia } from './fainas-de-teste.js';
 
-const granito = fainasActProvisorias.find((faina) => faina.codigoDaTabela === '3.1')!;
-const peacao = fainasActProvisorias.find((faina) => faina.codigoDaTabela === '14.1.0')!;
+const granito = semPiso(fainaDeProducao);
+const peacao = fainaDeSalarioDia;
 
-function comPiso(base: RegistroDeFaina, piso: number): RegistroDeFaina {
-  return { ...base, regraActProvisoria: { ...base.regraActProvisoria!, producaoMinimaPorTernoPorPeriodo: piso } };
+/** O piso da ACT é em reais: a produção que o iguala é `salário-dia ÷ taxa`. */
+function comPiso(base: RegistroDeFaina, produtividadeDaVirada: number): RegistroDeFaina {
+  const estiva = base.regra!.estiva;
+  return {
+    ...base,
+    regra: {
+      ...base.regra!,
+      estiva: { ...estiva, salarioDiaPorCota: (estiva.taxa ?? 0) * produtividadeDaVirada },
+    },
+  };
+}
+
+/** Piso desprezível: a produção paga desde o primeiro ponto da grade. */
+function semPiso(base: RegistroDeFaina): RegistroDeFaina {
+  return {
+    ...base,
+    regra: { ...base.regra!, estiva: { ...base.regra!.estiva, salarioDiaPorCota: 0 } },
+  };
 }
 
 function analisar(registro: RegistroDeFaina) {

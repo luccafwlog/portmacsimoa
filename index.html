@@ -21,7 +21,7 @@
         </nav>
         <div class="topbar-meta">
           <span class="status-dot" aria-hidden="true"></span>
-          <span>ambiente interno · ACT/CCT provisórias</span>
+          <span>ambiente interno · catálogo ACT</span>
         </div>
       </header>
 
@@ -358,7 +358,7 @@
 
         <footer class="footer-note">
           <span>PORTMAC · simulador de custo de operação</span>
-          <span><i></i> ACT/CCT provisórias em ampliação</span>
+          <span><i></i> catálogo ACT em cadastramento</span>
         </footer>
       </main>
 
@@ -406,27 +406,21 @@
 
         <div class="catalog-stats">
           <div class="catalog-stat"><span>FAINAS CADASTRADAS</span><strong id="catalog-count">0</strong></div>
-          <div class="catalog-stat"><span>ORIGEM ACT</span><strong id="catalog-act-count">0</strong></div>
-          <div class="catalog-stat"><span>ORIGEM CCT</span><strong id="catalog-cct-count">0</strong></div>
+          <div class="catalog-stat"><span>FONTE DOCUMENTAL</span><strong class="catalog-stat-note">ACT</strong></div>
         </div>
 
         <section class="panel page-card catalog-card">
           <div class="panel-heading">
             <div><span class="section-index">01</span><h2>Fainas e regras de cálculo</h2></div>
-            <span class="required-note">ACT prioritária</span>
+            <span class="required-note">fonte ACT</span>
           </div>
           <div class="catalog-toolbar">
             <label class="catalog-search">
               <span>Buscar faina</span>
               <input id="catalog-search" type="search" placeholder="Nome, código ou grupo" autocomplete="off" />
             </label>
-            <div class="catalog-filters" role="group" aria-label="Filtrar por fonte documental">
-              <button class="catalog-filter active" type="button" data-catalog-source="TODAS" aria-pressed="true">Todas</button>
-              <button class="catalog-filter" type="button" data-catalog-source="ACT" aria-pressed="false">ACT</button>
-              <button class="catalog-filter" type="button" data-catalog-source="CCT" aria-pressed="false">CCT</button>
-            </div>
             <span id="catalog-visible-count" class="catalog-visible-count" aria-live="polite"></span>
-            <span class="catalog-legend">ACT/CCT · provisória</span>
+            <span class="catalog-legend">fonte ACT</span>
           </div>
           <div class="table-wrap catalog-table-wrap">
             <table class="catalog-table">
@@ -436,7 +430,7 @@
               <tbody id="catalog-table-body"></tbody>
             </table>
           </div>
-          <div class="catalog-note"><span class="note-mark">i</span><p>As fainas da CCT foram levantadas por grupo e código de tabela para evitar colisões. Registros pendentes ficam visíveis para conferência, mas não aparecem na nova simulação até que sua regra de custo seja validada.</p></div>
+          <div class="catalog-note"><span class="note-mark">i</span><p>O catálogo usa exclusivamente a ACT. O cadastro anterior foi retirado por estar incorreto e a transcrição do documento correto está pendente: enquanto ela não chega, não há faina disponível para simulação. Registros pendentes ficam visíveis para conferência, mas não aparecem na nova simulação até que sua regra de custo seja validada.</p></div>
         </section>
       </main>
     </div>

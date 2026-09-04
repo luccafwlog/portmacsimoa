@@ -4,8 +4,7 @@ import { obterMajoracaoDoPeriodo } from '../src/dominio/majoracoes.js';
 import { majoracaoDoPeriodoProjetado } from '../src/motor/simulador.js';
 import { calendarioOperacional } from '../src/calendario/operacional.js';
 import { CatalogoPortmac } from '../src/catalogo/portmac.js';
-import { fainasActProvisorias } from '../src/catalogo/act-provisorio.js';
-import { fainasCctProvisorias } from '../src/catalogo/cct-provisorio.js';
+import { COTAS_DA_ESTIVA_DE_TESTE, TAXA_DA_ESTIVA_DE_TESTE, fainaDeProducao } from './fainas-de-teste.js';
 import { simular } from '../src/motor/simulador.js';
 import { ehFeriadoNacional, ehFeriadoVilaVelha } from '../src/calendario/feriados.js';
 
@@ -35,14 +34,14 @@ describe('majorações por período', () => {
   });
 
   it('aplica 87,5% no sábado noturno e no domingo diurno', () => {
-    expect(obterMajoracaoDoPeriodo({ data: data(2026, 9, 5), periodo: '19-01', fonte: 'CCT' }).fator)
+    expect(obterMajoracaoDoPeriodo({ data: data(2026, 9, 5), periodo: '19-01', fonte: 'ACT' }).fator)
       .toBe(1.875);
-    expect(obterMajoracaoDoPeriodo({ data: data(2026, 9, 6), periodo: '07-13', fonte: 'CCT' }).fator)
+    expect(obterMajoracaoDoPeriodo({ data: data(2026, 9, 6), periodo: '07-13', fonte: 'ACT' }).fator)
       .toBe(1.875);
   });
 
-  it('aplica o adicional noturno provisório de 25% da CCT em dia útil', () => {
-    expect(obterMajoracaoDoPeriodo({ data: data(2026, 9, 8), periodo: '19-01', fonte: 'CCT' }).fator)
+  it('aplica o adicional noturno de 25% da ACT em dia útil', () => {
+    expect(obterMajoracaoDoPeriodo({ data: data(2026, 9, 8), periodo: '19-01', fonte: 'ACT' }).fator)
       .toBe(1.25);
   });
 
@@ -80,7 +79,7 @@ describe('majorações por período', () => {
       data: data(2026, 9, 6),
       periodo: '19-01',
       feriado: true,
-      fonte: 'CCT',
+      fonte: 'ACT',
     });
 
     expect(resultado.fator).toBe(2.5);
@@ -90,44 +89,39 @@ describe('majorações por período', () => {
   it('leva a majoração de cada período para o custo e para a memória', () => {
     const resultado = simular(
       {
-        faina: fainasActProvisorias[0]!.codigo,
+        faina: fainaDeProducao.codigo,
         inicio: { data: data(2026, 9, 7), periodo: '19-01' },
-        volumeToneladas: 20,
-        produtividadeToneladasPorPeriodo: 10,
+        volumeToneladas: 4000,
+        produtividadeToneladasPorPeriodo: 2000,
         totalDeTernos: 2,
       },
-      new CatalogoPortmac(fainasActProvisorias),
+      new CatalogoPortmac([fainaDeProducao]),
       calendarioOperacional,
     );
 
     expect(resultado.periodos[0]?.custo.majoracao?.adicionalPercentual).toBe(150);
     expect(resultado.periodos[1]?.custo.majoracao?.adicionalPercentual).toBe(25);
     expect(resultado.periodos[0]?.custo.total).toBeGreaterThan(resultado.periodos[1]?.custo.total ?? 0);
-    expect(resultado.periodos[0]?.custo.memoria[2]?.descricao).toContain('feriado');
+    expect(resultado.periodos[0]?.custo.memoria[1]?.descricao).toContain('feriado');
   });
 
-  it('calcula a CCT provisória com as cinco categorias do terno', () => {
-    const faina = fainasCctProvisorias.find((item) => item.codigoDaTabela === '1.1');
-    expect(faina?.status).toBe('PROVISORIA');
-    expect(faina?.regraCctProvisoria?.composicao).toHaveLength(5);
-
+  it('cobra a produção do terno em um período sem adicional', () => {
     const resultado = simular(
       {
-        faina: faina!.codigo,
+        faina: fainaDeProducao.codigo,
         inicio: { data: data(2026, 9, 8), periodo: '07-13' },
-        volumeToneladas: 100,
-        produtividadeToneladasPorPeriodo: 100,
+        volumeToneladas: 1000,
+        produtividadeToneladasPorPeriodo: 1000,
         totalDeTernos: 1,
       },
-      new CatalogoPortmac([], fainasCctProvisorias),
+      new CatalogoPortmac([fainaDeProducao]),
       calendarioOperacional,
     );
 
-    const esperado = 100 * 1.0265 * (1 + 1.152877);
+    const esperado = 1000 * TAXA_DA_ESTIVA_DE_TESTE * COTAS_DA_ESTIVA_DE_TESTE;
     expect(resultado.periodos[0]?.custo.total).toBeCloseTo(esperado, 6);
     expect(resultado.periodos[0]?.custo.memoria).toHaveLength(2);
-    expect(resultado.periodos[0]?.custo.memoria[0]?.descricao).toContain('tarifa unitária');
-    expect(resultado.periodos[0]?.custo.memoria[1]?.descricao).toContain('CCT provisória');
+    expect(resultado.periodos[0]?.custo.memoria[1]?.descricao).toContain('Fonte: Catálogo falso');
   });
 });
 
@@ -155,7 +149,7 @@ describe('majoração de um período projetado', () => {
 
   it('reconhece o feriado municipal do calendário de Vila Velha', () => {
     // 28/04 é Nossa Senhora da Penha.
-    const majoracao = majoracaoDoPeriodoProjetado(periodo(28, '07-13'), 'CCT');
+    const majoracao = majoracaoDoPeriodoProjetado(periodo(28, '07-13'), 'ACT');
     expect(majoracao?.tipoDeDia).toBe('FERIADO');
     expect(majoracao?.adicionalPercentual).toBe(100);
   });
