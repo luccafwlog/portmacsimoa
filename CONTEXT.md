@@ -149,33 +149,20 @@ o custo final nem uma previsão automática da operação.
 - sem cobertura de feriados municipais, estaduais ou portuários;
 - sem banco, autenticação ou histórico.
 
-## Produção mínima garantida — pendente
+## Piso de remuneração — resolvido pela ACT
 
-A regra de custo aceita `producaoMinimaPorTernoPorPeriodo`: com um piso, a
-quantidade cobrada é `max(produção, piso × ternos)`. **Nenhuma faina declara
-esse valor** — o catálogo está vazio —, e enquanto isso não mudar o cálculo não
-aplica piso algum.
+Não existe produção mínima em toneladas. A cláusula 5ª, § 2º da ACT estabelece
+um piso em **reais**: quando a remuneração por produção não alcança o
+salário-dia, ele é o mínimo do período requisitado. Como as cotas multiplicam os
+dois lados, o custo de um terno é `cotas × max(taxa × produção, salário-dia)` e a
+produção que iguala os dois é `salário-dia ÷ taxa`.
 
-É esse piso que cria o joelho da curva de custo por produtividade — abaixo dele
-o custo unitário cai como 1/produtividade, acima dele fica plano. A curva de
-referência levantada pela PORTMAC na planilha legada de fertilizantes cai de
-R$ 34,05 a cerca de R$ 26,50 entre 500 e 700 t por terno e depois estabiliza;
-essa razão de 1,28 na ponta baixa implica um piso perto de 650 t por terno por
-período. Sem os valores documentais por faina, o simulador não tem como apontar
-um ótimo próprio da faina, e diz isso na análise em vez de inventar um número.
+É esse ponto que dobra a curva de custo por produtividade. Para granéis ele cai
+em `306,97 ÷ 0,48 = 640 t` por terno por período — o mesmo joelho perto de 650 t
+que a curva legada de fertilizantes mostrava e que o projeto tratava como uma
+produção mínima documentalmente ausente. O número sai do Anexo I, não de
+suposição.
 
-## Catálogo vazio — estado atual
-
-`src/catalogo/act.ts` exporta uma lista vazia. A CCT saiu do sistema por
-completo (arquivos, tipos, filtro de fonte e tabela de majoração) e o
-mapeamento provisório da ACT foi apagado por estar errado. Sem faina
-cadastrada não há simulação: a interface diz isso no combobox e no catálogo em
-vez de oferecer um número inventado.
-
-O recadastro acrescenta registros em `src/catalogo/act.ts` com `fonte: 'ACT'` e
-uma `regraAct` — taxa-base, regime (produção ou salário-dia), unidade,
-encargos/contribuições e a composição do terno em cotas. Antes de transcrever,
-vale responder o que a auditoria em `docs/auditoria-do-calculo.md` deixou em
-aberto: se a taxa do documento é por cota ou pela equipe inteira. Os catálogos
-falsos dos testes (`testes/fainas-de-teste.ts`) servem apenas para validar o
-motor e não representam nenhuma tabela real.
+O catálogo cadastra as doze fainas da ACT em `src/catalogo/act.ts`, cada uma com
+regra de estiva e de conferentes. `docs/act-2026-2028.md` descreve o modelo e as
+pendências; a extração do documento está em `docs/fontes/`.

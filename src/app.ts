@@ -1,7 +1,7 @@
 import './styles.css';
 import { data, formatarData, formatarDataCurtaPtBr, formatarDataPtBr } from './dominio/tempo.js';
 import { calendarioOperacional } from './calendario/operacional.js';
-import { catalogoPortmac } from './catalogo/portmac.js';
+import { catalogoPortmac, cotasDaCategoria, homensDaCategoria, producaoQueIgualaOPiso } from './catalogo/portmac.js';
 import type { CustoOpcional, EntradaDeSimulacao, LinhaDeMemoria, PeriodoOgmo, ResultadoDeSimulacao, TipoDeCustoOpcional } from './dominio/tipos.js';
 import type { MajoracaoDoPeriodo } from './dominio/majoracoes.js';
 import { majoracaoDoPeriodoProjetado, simular } from './motor/simulador.js';
@@ -106,8 +106,7 @@ function renderCatalogPage(): void {
   setText('#catalog-visible-count', `${filtrados.length} ${filtrados.length === 1 ? 'faina encontrada' : 'fainas encontradas'}`);
   tableBody.innerHTML = filtrados.length ? filtrados.map((registro) => {
     const regra = registro.regra;
-    const regraPlanilha = registro.regraAct;
-    const status = registro.status === 'PENDENTE_DE_VALIDACAO' || (!regra && !regraPlanilha)
+    const status = registro.status === 'PENDENTE_DE_VALIDACAO' || !regra
       ? '<span class="pending-pill">Pendente</span><small>aguarda validação</small>'
       : registro.status === 'PROVISORIA'
         ? '<span class="pending-pill">Provisória</span><small>aguarda documento oficial</small>'
@@ -123,15 +122,15 @@ function renderCatalogPage(): void {
       <td><span class="catalog-group">${escapeHtml(registro.grupoDaTabela ?? 'Catálogo ACT')}</span><small>${escapeHtml(registro.vigencia)}</small></td>
       <td><span class="source-pill source-${registro.fonte.toLowerCase()}">${registro.fonte}</span>${status}</td>
       <td><span class="rule-value">${escapeHtml(rotuloDaUnidade(registro.unidade).plural)}</span><small>${escapeHtml(registro.unidade.toLowerCase())} · unidade da tabela</small></td>
-      <td>${regra ? `<span class="rule-value">${formatarMoeda(regra.taxaEstivaPorTonelada)}</span><small>estiva / ton / cota · ${formatarNumero(regra.cotasEstivaPorTerno)} cotas/terno · conferentes ${formatarMoeda(regra.taxaConferentesPorTonelada)} / ton</small>` : regraPlanilha ? `<span class="rule-value">${formatarMoeda(regraPlanilha.taxaBase)}</span><small>cotas da equipe · ${regraPlanilha.regime === 'PRODUCAO' ? 'produção' : 'salário-dia'} · +${formatarNumero(regraPlanilha.encargosContribuicaoAdicional * 100)}% encargos</small>` : '<span class="pending-rule">Regra não habilitada</span><small>transcrição documental</small>'}</td>
+      <td>${regra ? `<span class="rule-value">${regra.estiva.taxa === undefined ? formatarMoeda(regra.estiva.salarioDiaPorCota) : formatarMoeda(regra.estiva.taxa)}</span><small>${regra.estiva.taxa === undefined ? 'salário-dia por cota · sem produção' : `estiva por cota · ${formatarNumero(cotasDaCategoria(regra.estiva, 1))} cotas/terno${regra.conferentes ? ` · conferentes ${formatarMoeda(regra.conferentes.taxa ?? 0)}` : ''}`}</small>` : '<span class="pending-rule">Regra não habilitada</span><small>transcrição documental</small>'}</td>
     </tr>
     <tr id="${detailsId}" class="catalog-details-row" hidden>
-      <td colspan="5">${regraPlanilha ? renderCatalogMethod(registro, regraPlanilha) : '<div class="catalog-method-body"><p>Esta faina ainda não possui uma regra de custo habilitada.</p></div>'}</td>
+      <td colspan="5">${regra ? renderCatalogMethod(registro, regra) : '<div class="catalog-method-body"><p>Esta faina ainda não possui uma regra de custo habilitada.</p></div>'}</td>
     </tr>
   `;
   }).join('') : `<tr><td colspan="5" class="catalog-empty-result">${registros.length
     ? 'Nenhuma faina corresponde à busca atual.'
-    : 'Nenhuma faina cadastrada: o catálogo aguarda a transcrição da ACT correta.'}</td></tr>`;
+    : 'Nenhuma faina cadastrada no catálogo da ACT.'}</td></tr>`;
 }
 
 function renderClientsPage(): void {
@@ -273,31 +272,38 @@ function renderSavedBudgetDetails(resultado: ResultadoDeSimulacao, faina?: Retur
 
 function renderCatalogMethod(
   registro: ReturnType<typeof catalogoPortmac.listarRegistros>[number],
-  regra: NonNullable<ReturnType<typeof catalogoPortmac.listarRegistros>[number]['regraAct']>,
+  regra: NonNullable<ReturnType<typeof catalogoPortmac.listarRegistros>[number]['regra']>,
 ): string {
-  const formula = regra.regime === 'PRODUCAO'
-    ? 'cotas × tarifa-base × produção agregada dos ternos × encargos × majoração'
-    : 'cotas × tarifa-base × encargos × majoração × ternos';
-  const composition = regra.composicao.map((item) =>
-    `<li>${escapeHtml(item.categoria)}: ${item.homens} homens · ${formatarNumero(item.cotas)} cotas${item.funcoes.length ? ` · ${escapeHtml(item.funcoes.join(', '))}` : ''}</li>`,
-  ).join('');
+  const unidade = rotuloDaUnidade(regra.unidade);
+  const formula = regra.estiva.taxa === undefined
+    ? 'cotas × salário-dia × ternos × majoração'
+    : `cotas × max(taxa × produção por terno; salário-dia) × ternos × majoração${regra.conferentes ? ' + conferentes' : ''}`;
+  const virada = producaoQueIgualaOPiso(regra.estiva);
+  const categorias = [
+    { titulo: 'Estiva', regra: regra.estiva },
+    ...(regra.conferentes ? [{ titulo: 'Conferentes', regra: regra.conferentes }] : []),
+  ];
+  const blocos = categorias.map(({ titulo, regra: categoria }) => `
+    <div class="catalog-method-grid">
+      <div><span>${titulo} · taxa</span><strong>${categoria.taxa === undefined ? '—' : formatarMoeda(categoria.taxa)}</strong></div>
+      <div><span>Base da taxa</span><strong>${categoria.baseDaTaxa === 'POR_COTA' ? 'por cota' : 'equipe inteira'}</strong></div>
+      <div><span>Salário-dia (piso)</span><strong>${formatarMoeda(categoria.salarioDiaPorCota)}</strong></div>
+      <div><span>Cotas com 1 terno</span><strong>${formatarNumero(cotasDaCategoria(categoria, 1))}</strong></div>
+      <div><span>Homens</span><strong>${homensDaCategoria(categoria.composicao)}</strong></div>
+      <div><span>Vira o piso em</span><strong>${producaoQueIgualaOPiso(categoria) === undefined ? '—' : `${formatarNumero(producaoQueIgualaOPiso(categoria)!)} ${unidade.abreviacao}`}</strong></div>
+    </div>
+    <ul>${categoria.composicao.map((item) =>
+      `<li>${escapeHtml(item.categoria)}: ${item.homens} ${item.homens === 1 ? 'homem' : 'homens'} · ${formatarNumero(item.cotas)} cotas · ${item.escopo === 'POR_NAVIO' ? 'por navio' : 'por terno'}</li>`,
+    ).join('')}</ul>`).join('');
   return `<div class="catalog-method-body">
     <div class="catalog-method-top">
       <p class="catalog-method-formula"><strong>Fórmula aplicada</strong><code>${formula}</code></p>
       <div class="catalog-reference-detail"><span>Referência documental</span><small>${escapeHtml(registro.referencia)}</small></div>
     </div>
-    <div class="catalog-method-grid">
-      <div><span>Base monetária</span><strong>${formatarMoeda(regra.taxaBase)}</strong></div>
-      <div><span>Unidade</span><strong>${escapeHtml(rotuloDaUnidade(regra.unidade).plural)}</strong></div>
-      <div><span>Regime</span><strong>${regra.regime === 'PRODUCAO' ? 'produção' : 'salário-dia'}</strong></div>
-      <div><span>Tratamento da equipe</span><strong>cotas da equipe</strong></div>
-      <div><span>Encargos</span><strong>+${formatarNumero(regra.encargosContribuicaoAdicional * 100)}%</strong></div>
-      <div><span>Fonte</span><strong>${escapeHtml(registro.fonte)} · ${escapeHtml(registro.codigoDaTabela ?? registro.codigo)}</strong></div>
-    </div>
-    <p class="catalog-method-note">${regra.regime === 'PRODUCAO'
-      ? 'A produtividade informada é por terno; a produção do período já representa a soma da produtividade dos ternos alocados e não é multiplicada novamente.'
-      : 'A remuneração é calculada por terno e multiplicada pela quantidade de ternos do período.'}</p>
-    <ul>${composition}</ul>
+    ${blocos}
+    <p class="catalog-method-note">${virada === undefined
+      ? 'Faina de remuneração fixa: paga o salário-dia da equipe em cada período requisitado, independentemente da produção.'
+      : `Abaixo de ${formatarNumero(virada)} ${unidade.abreviacao} por terno por período, o período paga o salário-dia em vez da produção (cláusula 5ª, § 2º).`}</p>
   </div>`;
 }
 
@@ -1365,7 +1371,7 @@ function renderFainaOptions(): void {
     </button>
   `).join('') : `<div class="combobox-empty">${fainasSelecionaveis.length
     ? 'Nenhuma faina encontrada.'
-    : 'Nenhuma faina cadastrada: o catálogo aguarda a transcrição da ACT correta.'}</div>`;
+    : 'Nenhuma faina cadastrada no catálogo da ACT.'}</div>`;
   fainaOptionIndex = -1;
 }
 

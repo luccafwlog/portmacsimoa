@@ -1,69 +1,84 @@
-import type { ComposicaoDoTerno } from '../src/dominio/tipos.js';
 import type { RegistroDeFaina } from '../src/catalogo/portmac.js';
 
 /**
  * Fainas falsas para exercitar o motor.
  *
- * O catálogo da aplicação está vazio à espera da transcrição correta da ACT,
- * e mesmo depois dela os testes do motor não devem depender de um número
- * documental que pode mudar: uma correção de tabela não é uma regressão de
- * cálculo. Os valores abaixo existem só para tornar a conta verificável.
+ * Números redondos e inventados, escolhidos só para a conta ser verificável de
+ * cabeça: uma correção de tabela na ACT não deve quebrar o teste do motor. As
+ * fainas reais vivem em `src/catalogo/act.ts` e são conferidas pelos testes de
+ * catálogo, não por estes.
  */
-const ENCARGOS_E_CONTRIBUICOES = 1.152877;
 
-const COMPOSICAO_CARGA_GERAL: readonly ComposicaoDoTerno[] = [
-  { categoria: 'Conferentes', funcoes: ['Conferente-Chefe', 'Conferente de Lingada'], homens: 3, cotas: 4.15 },
-  { categoria: 'Estivadores', funcoes: ['Contramestre de Porão', 'Estivador de Porão'], homens: 8, cotas: 9.1 },
-];
-
-const COMPOSICAO_PEACAO: readonly ComposicaoDoTerno[] = [
-  { categoria: 'Estivadores', funcoes: ['Estivador de Peação'], homens: 4, cotas: 4 },
-];
-
-/** Faina de teste em regime de produção, cobrada por tonelada. */
+/** Estiva por cota, 10 cotas por terno, piso de R$ 1.000 por cota. */
 export const fainaDeProducao: RegistroDeFaina = {
   codigo: 'TESTE_PRODUCAO',
   codigoDaTabela: 'T.1',
-  grupoDaTabela: 'Teste · Carga Geral',
+  grupoDaTabela: 'Teste',
   descricao: 'Faina de teste em regime de produção',
-  tipoDeCarga: 'Carga geral de teste',
+  tipoDeCarga: 'Carga de teste',
   unidade: 'TON',
   fonte: 'ACT',
-  status: 'PROVISORIA',
+  status: 'VALIDADA',
   vigencia: 'teste',
   referencia: 'Catálogo falso de teste · T.1',
-  regraAct: {
-    taxaBase: 3.01,
-    regime: 'PRODUCAO',
+  regra: {
     unidade: 'TON',
-    encargosContribuicaoAdicional: ENCARGOS_E_CONTRIBUICOES,
-    composicao: COMPOSICAO_CARGA_GERAL,
+    estiva: {
+      taxa: 2,
+      baseDaTaxa: 'POR_COTA',
+      salarioDiaPorCota: 1000,
+      composicao: [
+        { categoria: 'Contramestre', funcoes: ['Contramestre'], homens: 1, cotas: 2 },
+        { categoria: 'Porão', funcoes: ['Porão'], homens: 8, cotas: 8 },
+      ],
+    },
   },
 };
 
-/** Faina de teste em salário-dia, cobrada por equipe e multiplicada por terno. */
+/** Faina sem taxa: paga sempre o salário-dia, como a peação da ACT. */
 export const fainaDeSalarioDia: RegistroDeFaina = {
   codigo: 'TESTE_SALARIO_DIA',
   codigoDaTabela: 'T.2',
-  grupoDaTabela: 'Teste · Peação',
-  descricao: 'Faina de teste em salário-dia',
+  grupoDaTabela: 'Teste',
+  descricao: 'Faina de teste em salário-dia fixo',
   tipoDeCarga: 'Peação de teste',
   unidade: 'EQUIPE',
   fonte: 'ACT',
-  status: 'PROVISORIA',
+  status: 'VALIDADA',
   vigencia: 'teste',
   referencia: 'Catálogo falso de teste · T.2',
-  regraAct: {
-    taxaBase: 515.2,
-    regime: 'SALARIO_DIA',
+  regra: {
     unidade: 'EQUIPE',
-    encargosContribuicaoAdicional: ENCARGOS_E_CONTRIBUICOES,
-    composicao: COMPOSICAO_PEACAO,
+    estiva: {
+      baseDaTaxa: 'POR_COTA',
+      salarioDiaPorCota: 500,
+      composicao: [{ categoria: 'Peação', funcoes: ['Estivador de peação'], homens: 4, cotas: 5 }],
+    },
   },
 };
 
-export const COTAS_DA_CARGA_GERAL = COMPOSICAO_CARGA_GERAL
-  .reduce((soma, item) => soma + item.cotas, 0);
-export const COTAS_DA_PEACAO = COMPOSICAO_PEACAO
-  .reduce((soma, item) => soma + item.cotas, 0);
-export const ENCARGOS_DE_TESTE = ENCARGOS_E_CONTRIBUICOES;
+/** Estiva + conferentes, com chefe por navio: exercita os dois escopos. */
+export const fainaComConferentes: RegistroDeFaina = {
+  ...fainaDeProducao,
+  codigo: 'TESTE_CONFERENTES',
+  codigoDaTabela: 'T.3',
+  descricao: 'Faina de teste com conferentes',
+  referencia: 'Catálogo falso de teste · T.3',
+  regra: {
+    unidade: 'TON',
+    estiva: fainaDeProducao.regra!.estiva,
+    conferentes: {
+      taxa: 5,
+      baseDaTaxa: 'POR_EQUIPE',
+      salarioDiaPorCota: 100,
+      composicao: [
+        { categoria: 'Chefe', funcoes: ['Chefe'], homens: 1, cotas: 2, escopo: 'POR_NAVIO' },
+        { categoria: 'Lingada', funcoes: ['Lingada'], homens: 1, cotas: 1 },
+      ],
+    },
+  },
+};
+
+export const COTAS_DA_ESTIVA_DE_TESTE = 10;
+export const TAXA_DA_ESTIVA_DE_TESTE = 2;
+export const PISO_DA_ESTIVA_DE_TESTE = 1000;

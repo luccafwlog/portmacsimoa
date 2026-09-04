@@ -4,7 +4,7 @@ import { obterMajoracaoDoPeriodo } from '../src/dominio/majoracoes.js';
 import { majoracaoDoPeriodoProjetado } from '../src/motor/simulador.js';
 import { calendarioOperacional } from '../src/calendario/operacional.js';
 import { CatalogoPortmac } from '../src/catalogo/portmac.js';
-import { COTAS_DA_CARGA_GERAL, ENCARGOS_DE_TESTE, fainaDeProducao } from './fainas-de-teste.js';
+import { COTAS_DA_ESTIVA_DE_TESTE, TAXA_DA_ESTIVA_DE_TESTE, fainaDeProducao } from './fainas-de-teste.js';
 import { simular } from '../src/motor/simulador.js';
 import { ehFeriadoNacional, ehFeriadoVilaVelha } from '../src/calendario/feriados.js';
 
@@ -91,8 +91,8 @@ describe('majorações por período', () => {
       {
         faina: fainaDeProducao.codigo,
         inicio: { data: data(2026, 9, 7), periodo: '19-01' },
-        volumeToneladas: 20,
-        produtividadeToneladasPorPeriodo: 10,
+        volumeToneladas: 4000,
+        produtividadeToneladasPorPeriodo: 2000,
         totalDeTernos: 2,
       },
       new CatalogoPortmac([fainaDeProducao]),
@@ -102,26 +102,26 @@ describe('majorações por período', () => {
     expect(resultado.periodos[0]?.custo.majoracao?.adicionalPercentual).toBe(150);
     expect(resultado.periodos[1]?.custo.majoracao?.adicionalPercentual).toBe(25);
     expect(resultado.periodos[0]?.custo.total).toBeGreaterThan(resultado.periodos[1]?.custo.total ?? 0);
-    expect(resultado.periodos[0]?.custo.memoria[2]?.descricao).toContain('feriado');
+    expect(resultado.periodos[0]?.custo.memoria[1]?.descricao).toContain('feriado');
   });
 
-  it('soma as categorias do terno em um período sem adicional', () => {
+  it('cobra a produção do terno em um período sem adicional', () => {
     const resultado = simular(
       {
         faina: fainaDeProducao.codigo,
         inicio: { data: data(2026, 9, 8), periodo: '07-13' },
-        volumeToneladas: 100,
-        produtividadeToneladasPorPeriodo: 100,
+        volumeToneladas: 1000,
+        produtividadeToneladasPorPeriodo: 1000,
         totalDeTernos: 1,
       },
       new CatalogoPortmac([fainaDeProducao]),
       calendarioOperacional,
     );
 
-    const esperado = 100 * 3.01 * COTAS_DA_CARGA_GERAL * (1 + ENCARGOS_DE_TESTE);
+    const esperado = 1000 * TAXA_DA_ESTIVA_DE_TESTE * COTAS_DA_ESTIVA_DE_TESTE;
     expect(resultado.periodos[0]?.custo.total).toBeCloseTo(esperado, 6);
-    expect(resultado.periodos[0]?.custo.memoria).toHaveLength(3);
-    expect(resultado.periodos[0]?.custo.memoria[2]?.descricao).toContain('Fonte: ACT');
+    expect(resultado.periodos[0]?.custo.memoria).toHaveLength(2);
+    expect(resultado.periodos[0]?.custo.memoria[1]?.descricao).toContain('Fonte: Catálogo falso');
   });
 });
 

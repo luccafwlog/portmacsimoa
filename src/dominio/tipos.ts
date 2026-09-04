@@ -21,36 +21,69 @@ export interface CustoOpcional {
   readonly custoTotal: number;
 }
 
-export type RegimeRemuneratorio = 'PRODUCAO' | 'SALARIO_DIA';
+/**
+ * Como a taxa do Anexo I remunera a equipe.
+ *
+ * `POR_COTA` — a taxa é de um homem e multiplica a soma das cotas da equipe.
+ * `POR_EQUIPE` — a taxa já é o valor arrecadado pela equipe inteira.
+ *
+ * A observação literal do Anexo I é "Conferente = Taxa equipe / Demais = Taxa
+ * homem", e o Anexo III, VII confirma para a estiva: "o salário-dia e o
+ * salário-produção são por homem da equipe, referente a 1 (uma) cota".
+ */
+export type BaseDaTaxa = 'POR_COTA' | 'POR_EQUIPE';
+
+/**
+ * Se a função é requisitada uma vez por terno ou uma vez para o navio.
+ *
+ * O Anexo Conferentes é explícito: "01 conferente chefe, por navio" contra
+ * "01 conferente lingada, para cada terno em operação". Cobrar o chefe em cada
+ * terno superfatura toda operação com mais de um terno.
+ */
+export type EscopoDaFuncao = 'POR_TERNO' | 'POR_NAVIO';
 
 export interface ComposicaoDoTerno {
   readonly categoria: string;
   readonly funcoes: readonly string[];
   readonly homens: number;
   readonly cotas: number;
+  /** Ausente equivale a `POR_TERNO`: é o caso de toda a estiva. */
+  readonly escopo?: EscopoDaFuncao;
 }
 
-export interface RegraDeComposicaoDaFaina {
-  readonly taxaBase: number;
-  readonly regime: RegimeRemuneratorio;
-  readonly unidade: UnidadeDeMedida;
-  /** Adicional de encargos/contribuições declarado pelo documento da ACT. */
-  readonly encargosContribuicaoAdicional: number;
+/**
+ * A regra de uma das duas categorias que compõem o custo de um período.
+ *
+ * O custo de um período é sempre estiva + conferentes: o Anexo I traz as duas
+ * em tabelas separadas, com bases de taxa diferentes.
+ */
+export interface RegraDeCategoria {
   /**
-   * Produção mínima faturável por terno em um período, quando a tabela
-   * da ACT garante um piso à equipe.
+   * Coluna "Total c/E.S" da taxa no Anexo I, por unidade movimentada.
    *
-   * Com um piso, a quantidade cobrada é `max(produção, mínimo × ternos)`: abaixo
-   * do piso paga-se o piso, acima dele paga-se a produção. É o que cria o joelho
-   * da curva de custo por produtividade — abaixo do ponto de virada o custo
-   * unitário cai como 1/produtividade, acima dele fica plano.
-   *
-   * PENDENTE DE LEVANTAMENTO: o catálogo está vazio à espera da ACT correta.
-   * Enquanto o piso estiver ausente, o cálculo não aplica piso algum e a curva
-   * de referência não tem joelho.
+   * Ausente quando a faina não tem produção — a peação é remuneração fixa e
+   * paga só o salário-dia.
    */
-  readonly producaoMinimaPorTernoPorPeriodo?: number;
+  readonly taxa?: number;
+  readonly baseDaTaxa: BaseDaTaxa;
+  /**
+   * Coluna "Salário Dia · Total c/E.S" do Anexo I: o piso de um período.
+   *
+   * Cláusula 5ª, § 2º: quando a remuneração por produção não alcança o
+   * salário-dia, ele é o mínimo do período requisitado. O piso é em REAIS por
+   * cota — não existe piso de tonelagem nesta ACT. Como as cotas multiplicam os
+   * dois lados, o custo de um terno é `cotas × max(taxa × produção, salário-dia)`
+   * e a produção que iguala os dois é `salário-dia ÷ taxa`.
+   */
+  readonly salarioDiaPorCota: number;
   readonly composicao: readonly ComposicaoDoTerno[];
+}
+
+export interface RegraDaFaina {
+  readonly unidade: UnidadeDeMedida;
+  readonly estiva: RegraDeCategoria;
+  /** Ausente quando a faina não requisita conferentes, como a peação. */
+  readonly conferentes?: RegraDeCategoria;
 }
 
 export interface InicioDaOperacao {
