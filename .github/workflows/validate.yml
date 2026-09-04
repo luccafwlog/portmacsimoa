@@ -19,15 +19,10 @@ jobs:
   validate:
     name: Test and build
     runs-on: ubuntu-latest
-    # Tudo neste job, menos o `npm ci`, roda em 12 segundos. As 11 execuções
-    # anteriores levaram de 18 a 26 segundos ponta a ponta; na primeira execução
-    # do PR #28 o `npm ci` sozinho levou 7 minutos e o job ainda assim passou.
-    #
-    # O limite não existe para reprovar uma instalação lenta — essa execução foi
-    # correta, só demorada, e teria passado dentro destes 10 minutos. Ele existe
-    # para que um `npm ci` que de fato trave pare em 10 minutos em vez de ocupar
-    # o runner até o teto padrão de seis horas.
-    timeout-minutes: 10
+    # Um `npm ci` que de fato trave para aqui, em vez de ocupar o runner até o
+    # teto padrão de seis horas. O job roda em torno de 20 segundos, então cinco
+    # minutos são folga de sobra sem deixar um travamento correr solto.
+    timeout-minutes: 5
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -38,8 +33,21 @@ jobs:
           node-version: 20
           cache: npm
 
+      # `--ignore-scripts` porque o postinstall é o job inteiro: medido aqui,
+      # `npm ci` leva 228s e `npm ci --ignore-scripts` leva 3s, e nas duas
+      # execuções do PR #28 a instalação levou 7m01s enquanto todo o resto do
+      # job somava 12s. O lockfile tem três cópias do esbuild (0.25.12 em vite,
+      # 0.21.5 em vitest e em vite-node), cada uma com script de instalação que
+      # valida o binário pela rede — por isso o npm não imprime aviso nenhum: o
+      # tempo é gasto dentro do script do pacote, não no download do npm.
+      #
+      # É seguro aqui: o binário do esbuild vem do pacote de plataforma
+      # `@esbuild/linux-x64`, não do postinstall. Verificado — os 73 testes
+      # passam e o `vite build` sai com os mesmos hashes de bundle. Se algum dia
+      # entrar uma dependência que precise de verdade do script de instalação,
+      # é esta linha que precisa voltar atrás.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Run tests
         run: npm test
