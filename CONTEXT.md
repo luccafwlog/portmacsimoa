@@ -38,6 +38,12 @@ o custo final nem uma previsão automática da operação.
   mapeamento provisório da ACT — foi retirado, o primeiro por decisão de
   negócio e o segundo por estar incorreto.
 
+- **ACT 2026/2028** — o acordo coletivo assinado em 02/06/2026 é a única fonte
+  de taxas, salários, composição de equipe e adicionais. A segunda e última
+  referência é o calendário: fins de semana, feriados nacionais e os feriados
+  municipais de **Vila Velha**. `docs/act-2026-2028.md` resume as regras
+  confirmadas e a extração completa está em `docs/fontes/`.
+
 ## Fluxo decidido
 
 1. O usuário informa opcionalmente o cliente e informa faina, data e período de
