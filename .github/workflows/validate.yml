@@ -1,0 +1,58 @@
+name: Validate application
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Test and build
+    runs-on: ubuntu-latest
+    # Um `npm ci` que de fato trave para aqui, em vez de ocupar o runner até o
+    # teto padrão de seis horas. O job roda em torno de 20 segundos, então cinco
+    # minutos são folga de sobra sem deixar um travamento correr solto.
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # `--ignore-scripts` porque o postinstall é o job inteiro: medido aqui,
+      # `npm ci` leva 228s e `npm ci --ignore-scripts` leva 3s, e nas duas
+      # execuções do PR #28 a instalação levou 7m01s enquanto todo o resto do
+      # job somava 12s. O lockfile tem três cópias do esbuild (0.25.12 em vite,
+      # 0.21.5 em vitest e em vite-node), cada uma com script de instalação que
+      # valida o binário pela rede — por isso o npm não imprime aviso nenhum: o
+      # tempo é gasto dentro do script do pacote, não no download do npm.
+      #
+      # É seguro aqui: o binário do esbuild vem do pacote de plataforma
+      # `@esbuild/linux-x64`, não do postinstall. Verificado — os 73 testes
+      # passam e o `vite build` sai com os mesmos hashes de bundle. Se algum dia
+      # entrar uma dependência que precise de verdade do script de instalação,
+      # é esta linha que precisa voltar atrás.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run tests
+        run: npm test
+
+      # `npm run build` é `tsc --noEmit && vite build`: o typecheck já está
+      # dentro dele. Um passo separado compilaria o projeto inteiro duas vezes.
+      - name: Typecheck and build
+        run: npm run build
